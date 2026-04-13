@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react';
-import { StyleSheet, View, Text, Alert, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, Text, Alert, TouchableOpacity, ActivityIndicator } from 'react-native';
 import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Mapbox from '@rnmapbox/maps';
@@ -24,32 +24,6 @@ type SpotFeature = {
   };
 };
 
-const EXPLORER_SPOTS = {
-  type: 'FeatureCollection',
-  features: [
-    {
-      type: 'Feature',
-      properties: { id: '1', name: 'Jem Castle', vibe: 'Epic Views', intensity: 0.9 },
-      geometry: { type: 'Point', coordinates: [-78.866910, 35.711561] },
-    },
-    {
-      type: 'Feature',
-      properties: { id: '1', name: 'DUMBO Rooftop', vibe: 'Epic Views', intensity: 0.9 },
-      geometry: { type: 'Point', coordinates: [-73.9910, 40.7033] },
-    },
-    {
-      type: 'Feature',
-      properties: { id: '2', name: 'LES Skatepark', vibe: 'High Energy', intensity: 0.7 },
-      geometry: { type: 'Point', coordinates: [-73.9951, 40.7102] },
-    },
-    {
-      type: 'Feature',
-      properties: { id: '3', name: 'High Line Hidden Garden', vibe: 'Chill', intensity: 0.4 },
-      geometry: { type: 'Point', coordinates: [-74.0048, 40.7480] },
-    },
-  ] as SpotFeature[],
-};
-
 export default function MapScreen() {
 
   const centerOnUser = () => {
@@ -68,8 +42,61 @@ export default function MapScreen() {
 
   const [selectedSpot, setSelectedSpot] = useState<SpotFeature | null>(null);
   const [userCoords, setUserCoords] = useState<[number, number] | null>(null);
-
   const [sheetIndex, setSheetIndex] = useState(0);
+  const [spots, setSpots] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [currentCity, setCurrentCity] = useState<string | null>(null);
+
+
+
+  const [featureCollection, setFeatureCollection] = useState({
+    type: 'FeatureCollection',
+    features: [],
+  });
+
+  const fetchSpots = async () => {
+    try {
+      // Replace with your Fedora IP
+      const response = await fetch('http://192.168.1.223:8080/api/spots');
+      const data = await response.json();
+
+      // Convert Spring Boot Spot objects to GeoJSON Features
+      const features = data.map((spot: any) => ({
+        type: 'Feature',
+        properties: {
+          id: spot.id,
+          name: spot.name,
+          vibe: spot.vibe,
+          intensity: spot.intensity,
+        },
+        geometry: {
+          type: 'Point',
+          coordinates: [spot.location[1], spot.location[0]], // [Lng, Lat] for Mapbox
+        },
+      }));
+
+      setFeatureCollection({
+        type: 'FeatureCollection',
+        features: features,
+      });
+    } catch (error) {
+      console.error("Backend fetch failed:", error);
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    AsyncStorage.setItem('last_viewed_spot', '');
+    fetchSpots();
+  }, []);
+
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    fetchSpots();
+  };
 
   const buttonBottom = sheetIndex === 0 ? 150 : sheetIndex === 1 ? 300 : -150;
 
@@ -88,44 +115,71 @@ export default function MapScreen() {
     return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
   };
 
-  const handleCheckIn = () => {
-    if (!userCoords || !selectedSpot) return;
+  const handleCheckIn = async () => {
+    if (!userCoords || !selectedSpot) {
+      Alert.alert("GPS Loading", "Wait a second for your location to lock in.");
+      return;
+    }
 
-    const [spotLng, spotLat] = selectedSpot.geometry.coordinates;
+    if (!selectedSpot) return;
+
+    const spotId = selectedSpot.properties.id;
+    const spotCoords = selectedSpot.geometry.coordinates;
 
     const distance = getDistance(
-      userCoords[1],
-      userCoords[0],
-      spotLat,
-      spotLng
+      userCoords[1], userCoords[0], // User [Lat, Lng]
+      spotCoords[1], spotCoords[0]  // Spot [Lat, Lng]
     );
 
-    if (distance < 150) {
-      Alert.alert('Success', `Checked in at ${selectedSpot.properties.name}`);
-    } else {
+    if (distance > 105) {
       Alert.alert(
-        'Too far',
-        `You are ${Math.round(distance)} meters away. Move closer (within 100m).`
+        "Out of Range",
+        `You are ${Math.round(distance)}m away. You must be within 100m to check in!`
       );
+      return;
+    }
+
+    try {
+      // Again, use your Fedora's local IP here
+      const response = await fetch(`http://192.168.1.223:8080/api/checkins/${spotId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (response.ok) {
+        alert(`Checked into ${selectedSpot.properties.name}! The vibe is growing.`);
+        handleRefresh(); // Update the map to show the new intensity
+        bottomSheetRef.current?.collapse();
+      }
+    } catch (error) {
+      console.error("Check-in failed:", error);
+      alert("Could not reach the server. Are you on the right Wi-Fi?");
     }
   };
 
   useEffect(() => {
     (async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
-
-      if (status !== 'granted') {
-        Alert.alert('Permission Denied', 'Location access is required.');
-        return;
-      }
+      if (status !== 'granted') return;
 
       const location = await Location.getCurrentPositionAsync({});
       const coords: [number, number] = [
         location.coords.longitude,
         location.coords.latitude,
       ];
-
       setUserCoords(coords);
+
+      // --- REVERSE GEOCODING LOGIC ---
+      try {
+        const reverseCoords = { latitude: coords[1], longitude: coords[0] };
+        const address = await Location.reverseGeocodeAsync(reverseCoords);
+        if (address.length > 0) {
+          // Most addresses return a "city" or "district"
+          setCurrentCity(address[0].city || address[0].subregion);
+        }
+      } catch (e) {
+        console.error("Reverse geocoding failed", e);
+      }
 
       cameraRef.current?.setCamera({
         centerCoordinate: coords ? coords : NYC_COORDS,
@@ -151,11 +205,25 @@ export default function MapScreen() {
     loadLastSpot();
   }, []);
 
+
+
+  if (isLoading) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color="#FB923C" />
+      </View>
+    );
+  }
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <View style={styles.container}>
         <Mapbox.MapView
           scaleBarEnabled={false}
+          logoEnabled={true}
+          logoPosition={{ top: 10, left: 10 }} // Nudge it up so the BottomSheet doesn't hide it
+          attributionEnabled={true}
+          attributionPosition={{ top: 10, left: 100 }}
           compassEnabled={true}
           compassPosition={{ top: 25, right: 25 }}
           style={styles.map}
@@ -169,51 +237,37 @@ export default function MapScreen() {
 
           <Mapbox.ShapeSource
             id="spots"
-            shape={EXPLORER_SPOTS}
+            shape={featureCollection} // Use the state here
             hitbox={{ width: 44, height: 44 }}
             onPress={async (event) => {
-              const feature = event.features?.[0] as SpotFeature | undefined;
+              const feature = event.features?.[0];
               if (!feature) return;
 
+              // selectedSpot now works with the dynamic data
               setSelectedSpot(feature);
 
-              await AsyncStorage.setItem(
-                'last_viewed_spot',
-                JSON.stringify(feature)
-              );
-
               bottomSheetRef.current?.snapToIndex(1);
-
               cameraRef.current?.flyTo(feature.geometry.coordinates, 800);
             }}
           >
             <Mapbox.CircleLayer
               id="spots-layer"
+              existing={false}
               style={{
                 circleRadius: 25,
                 circleColor: '#FB923C',
-                circleOpacity: 0.5,
+                circleOpacity: ['get', 'intensity'],
                 circleBlur: 0.8,
               }}
             />
 
-            <Mapbox.CircleLayer
-              id="selected-layer"
-              filter={['==', ['get', 'id'], selectedSpot?.properties.id ?? '']}
-              style={{
-                circleRadius: 35,
-                circleColor: '#FFFBEB',
-                circleOpacity: 0.3,
-                circleBlur: 1,
-              }}
-            />
           </Mapbox.ShapeSource>
 
           <Mapbox.Camera
             ref={cameraRef}
             defaultSettings={{
               centerCoordinate: NYC_COORDS,
-              zoomLevel: 14,
+              zoomLevel: 16,
             }}
           />
         </Mapbox.MapView>
@@ -228,6 +282,27 @@ export default function MapScreen() {
           pointerEvents={sheetIndex === 2 ? 'none' : 'auto'}
         >
           <MaterialIcons name="my-location" size={24} color="#374151" />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.floatingButton,
+            {
+              // Position it exactly 60px (button height + gap) above the find-me button
+              bottom: buttonBottom + 64,
+              opacity: sheetIndex === 2 ? 0 : 1,
+              backgroundColor: '#FB923C' // Distinct color for refresh
+            }
+          ]}
+          onPress={handleRefresh}
+          disabled={isRefreshing}
+          activeOpacity={0.7}
+        >
+          {isRefreshing ? (
+            <ActivityIndicator size="small" color="white" />
+          ) : (
+            <MaterialIcons name="refresh" size={24} color="white" />
+          )}
         </TouchableOpacity>
 
         <BottomSheet
@@ -263,7 +338,17 @@ export default function MapScreen() {
               </>
             ) : (
               <>
-                <Text style={styles.title}>Explore 🗺️</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 5 }}>
+                  <Text style={styles.title}>
+                    Explore {currentCity || "the Area"}
+                  </Text>
+                  <MaterialIcons
+                    name="map"
+                    size={24}
+                    color="#3ca5fb"
+                    style={{ marginLeft: 8 }} // Margin moved to the left to space it from the text
+                  />
+                </View>
                 <Text style={styles.subtitle}>
                   Tap a glow to reveal the vibe
                 </Text>
@@ -287,7 +372,7 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   title: { fontSize: 22, fontWeight: 'bold', color: '#1F2937' },
-  subtitle: { fontSize: 16, fontWeight: '500', color: '#6B7280', marginBottom: 15},
+  subtitle: { fontSize: 16, fontWeight: '500', color: '#6B7280', marginBottom: 15 },
   spotCard: {
     marginTop: 20,
     width: '100%',
@@ -308,11 +393,16 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 20,
     backgroundColor: 'white',
-    width: 50,
-    height: 50,
-    borderRadius: 12,
+    width: 48,           // Fixed width and height ensures 
+    height: 48,          // they stay square
+    borderRadius: 18,    // Lower value = Square with rounded corners
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 3,
+    zIndex: 10,
   },
 });

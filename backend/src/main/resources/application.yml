@@ -1,0 +1,20 @@
+spring:
+  application:
+    name: vibe-app
+  
+  datasource:
+    # Pointing to the Docker container we'll spin up
+    url: jdbc:postgresql://localhost:5432/revynd
+    username: jem
+    password: password123
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    properties:
+      hibernate:
+        # Crucial for PostGIS support in Hibernate 6
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      # Creates/Updates tables based on your Java Entities
+      ddl-auto: update
+    show-sql: true

@@ -1,0 +1,16 @@
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: revynd_db
+    environment:
+      POSTGRES_USER: jem
+      POSTGRES_PASSWORD: password123
+      POSTGRES_DB: revynd
+    ports:
+      - "5432:5432"
+    volumes:
+      - revynd_data:/var/lib/postgresql/data
+    restart: always
+
+volumes:
+  revynd_data:
