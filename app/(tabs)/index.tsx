@@ -72,7 +72,7 @@ export default function MapScreen() {
         },
         geometry: {
           type: 'Point',
-          coordinates: [spot.location[1], spot.location[0]], // [Lng, Lat] for Mapbox
+          coordinates: [spot.location[0], spot.location[1]],
         },
       }));
 
@@ -140,20 +140,23 @@ export default function MapScreen() {
     }
 
     try {
-      // Again, use your Fedora's local IP here
       const response = await fetch(`http://192.168.1.223:8080/api/checkins/${spotId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       });
 
       if (response.ok) {
-        alert(`Checked into ${selectedSpot.properties.name}! The vibe is growing.`);
-        handleRefresh(); // Update the map to show the new intensity
-        bottomSheetRef.current?.collapse();
+        Alert.alert("Success", "Vibe boosted!");
+        handleRefresh();
+      } else if (response.status === 429) {
+        // 🛑 Handle the spam protection error
+        const message = await response.text();
+        Alert.alert("Slow Down", message);
+      } else {
+        Alert.alert("Error", "Something went wrong on the server.");
       }
     } catch (error) {
-      console.error("Check-in failed:", error);
-      alert("Could not reach the server. Are you on the right Wi-Fi?");
+      console.error(error);
     }
   };
 
@@ -225,7 +228,7 @@ export default function MapScreen() {
           attributionEnabled={true}
           attributionPosition={{ top: 10, left: 100 }}
           compassEnabled={true}
-          compassPosition={{ top: 25, right: 25 }}
+          compassPosition={{ top: 45, left: 35 }}
           style={styles.map}
           styleURL={Mapbox.StyleURL.Light}
           onPress={() => {
@@ -250,6 +253,18 @@ export default function MapScreen() {
               cameraRef.current?.flyTo(feature.geometry.coordinates, 800);
             }}
           >
+
+            <Mapbox.CircleLayer
+              id="spots-anchor"
+              style={{
+                circleRadius: 5,
+                circleColor: '#FB923C', // Neutral grey
+                circleStrokeWidth: 1,
+                circleStrokeColor: 'black',
+                circleOpacity: 0.8,
+              }}
+            />
+
             <Mapbox.CircleLayer
               id="spots-layer"
               existing={false}
@@ -314,29 +329,40 @@ export default function MapScreen() {
           onAnimate={(fromIndex, toIndex) => setSheetIndex(toIndex)}
         >
           <BottomSheetView style={styles.contentContainer}>
-            {selectedSpot ? (
-              <>
-                <Text style={styles.title}>
-                  {selectedSpot.properties.name} 🧭
-                </Text>
-                <Text style={styles.subtitle}>
-                  {selectedSpot.properties.vibe}
-                </Text>
+            {selectedSpot ? (() => {
+              // 💡 LIVE DATA LOOKUP: Find the current version of this spot in your main state
+              const liveSpot = featureCollection?.features.find(
+                (f) => f.properties.id === selectedSpot.properties.id
+              );
 
-                <View style={styles.spotCard}>
-                  <Text style={styles.vibeText}>
-                    Density: {Math.round(selectedSpot.properties.intensity * 100)}%
+              // Fallback to selectedSpot if liveSpot isn't found during a transition
+              const displaySpot = liveSpot || selectedSpot;
+
+              return (
+                <>
+                  <Text style={styles.title}>
+                    {displaySpot.properties.name} 🧭
+                  </Text>
+                  <Text style={styles.subtitle}>
+                    {displaySpot.properties.vibe}
                   </Text>
 
-                  <TouchableOpacity
-                    style={styles.checkInButton}
-                    onPress={handleCheckIn}
-                  >
-                    <Text style={styles.buttonText}>Check In</Text>
-                  </TouchableOpacity>
-                </View>
-              </>
-            ) : (
+                  <View style={styles.spotCard}>
+                    <Text style={styles.vibeText}>
+                      {/* This now updates dynamically when handleRefresh finishes */}
+                      Density: {Math.round(displaySpot.properties.intensity * 100)}%
+                    </Text>
+
+                    <TouchableOpacity
+                      style={styles.checkInButton}
+                      onPress={handleCheckIn}
+                    >
+                      <Text style={styles.buttonText}>Check In</Text>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              );
+            })() : (
               <>
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 5 }}>
                   <Text style={styles.title}>
@@ -346,7 +372,7 @@ export default function MapScreen() {
                     name="map"
                     size={24}
                     color="#3ca5fb"
-                    style={{ marginLeft: 8 }} // Margin moved to the left to space it from the text
+                    style={{ marginLeft: 8 }}
                   />
                 </View>
                 <Text style={styles.subtitle}>
