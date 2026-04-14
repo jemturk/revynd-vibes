@@ -1,21 +1,26 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { 
-  View, 
-  Text, 
-  FlatList, 
-  StyleSheet, 
-  RefreshControl, 
-  ActivityIndicator 
+import {
+  View,
+  Text,
+  FlatList,
+  StyleSheet,
+  RefreshControl,
+  ActivityIndicator,
+  TouchableOpacity,
+  Alert
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 
 // Using the Record structure we defined for the backend
 interface CheckInRecord {
+  id: number;
   spotName: string;
   vibe: string;
   checkInTime: string;
   intensityAtTime: number;
 }
+
+const API_URL = 'http://192.168.1.223:8080/api';
 
 const HistoryScreen = () => {
   const [history, setHistory] = useState<CheckInRecord[]>([]);
@@ -25,9 +30,11 @@ const HistoryScreen = () => {
   const fetchHistory = async () => {
     try {
       // Replace with your Fedora machine's IP
-      const response = await fetch('http://192.168.1.223:8080/api/checkins/history');
+      const response = await fetch(`${API_URL}/checkins/history`);
       const data = await response.json();
       setHistory(data);
+      console.log("Sample Item from Server:", data[0]);
+      return data;
     } catch (error) {
       console.error("History fetch failed:", error);
     } finally {
@@ -40,6 +47,40 @@ const HistoryScreen = () => {
     fetchHistory();
   }, []);
 
+
+  useEffect(() => {
+    fetchHistory()
+      .then((data) => {
+        // TypeScript now knows 'data' is CheckInRecord[] because of the Promise return type
+        setHistory(data);
+      })
+      .catch((err) => console.error(err));
+  }, []);
+
+  const deleteCheckIn = async (id: number) => {
+    const response = await fetch(`${API_URL}/checkins/history/${id}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) throw new Error('Failed to delete history item');
+  };
+
+  const handleDelete = async (id: number) => {
+
+    try {
+      await deleteCheckIn(id); // 1. Wait for DB to confirm
+
+      // 2. Update local state to trigger a re-render
+      setHistory((prevList) => {
+        const updatedList = prevList.filter(item => item.id !== id);
+        console.log("Items left after delete:", updatedList.length);
+        return [...updatedList];
+      });
+
+    } catch (error) {
+      Alert.alert("Error", "Could not delete from server.");
+    }
+  };
+
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     fetchHistory();
@@ -47,7 +88,7 @@ const HistoryScreen = () => {
 
   const renderItem = ({ item }: { item: CheckInRecord }) => {
     const date = new Date(item.checkInTime);
-    
+
     return (
       <View style={styles.historyCard}>
         <View style={styles.cardLeft}>
@@ -69,6 +110,9 @@ const HistoryScreen = () => {
             <View style={[styles.miniBarFill, { width: `${item.intensityAtTime * 100}%` }]} />
           </View>
         </View>
+        <TouchableOpacity onPress={() => handleDelete(item.id)}>
+          <MaterialIcons name="delete" size={20} color="#EF4444" />
+        </TouchableOpacity>
       </View>
     );
   };
@@ -90,6 +134,7 @@ const HistoryScreen = () => {
 
       <FlatList
         data={history}
+        extraData={history}
         renderItem={renderItem}
         keyExtractor={(item, index) => index.toString()}
         contentContainerStyle={styles.listContent}

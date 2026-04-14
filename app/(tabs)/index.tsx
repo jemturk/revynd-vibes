@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react';
-import { StyleSheet, View, Text, Alert, TouchableOpacity, ActivityIndicator, Animated } from 'react-native';
+import { StyleSheet, View, Text, Alert, TouchableOpacity, ActivityIndicator, Animated, StatusBar } from 'react-native';
 import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Mapbox from '@rnmapbox/maps';
@@ -8,6 +8,7 @@ import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+
 
 Mapbox.setAccessToken(Constants.expoConfig?.extra?.mapboxPublicToken || '');
 
@@ -165,7 +166,7 @@ export default function MapScreen() {
       spotCoords[1], spotCoords[0]  // Spot [Lat, Lng]
     );
 
-    if (distance > 100) {
+    if (distance > 105) {
       triggerAlert(`You're ${Math.round(distance)}m away. Get closer!`, 'warning');
       safeHaptic(Haptics.ImpactFeedbackStyle.Medium);
       return;
@@ -252,6 +253,13 @@ export default function MapScreen() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
+      <>
+        <StatusBar
+          barStyle="dark-content" // This makes battery/wifi/clock icons black/dark grey
+          backgroundColor="transparent" // Keeps it seamless with your header
+          translucent={true}
+        />
+      </>
       <View style={styles.container}>
         <Mapbox.MapView
           scaleBarEnabled={false}
