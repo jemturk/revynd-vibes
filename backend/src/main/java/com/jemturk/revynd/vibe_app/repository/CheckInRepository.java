@@ -12,7 +12,6 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 
 @Repository
 public interface CheckInRepository extends JpaRepository<CheckIn, Long> {
@@ -35,4 +34,6 @@ public interface CheckInRepository extends JpaRepository<CheckIn, Long> {
     List<CheckIn> findBySpotIdAndCheckInTimeAfter(Long spotId, LocalDateTime time);
 
     CheckIn findFirstBySpotIdOrderByCheckInTimeDesc(Long spotId);
+    
+    List<CheckIn> findAllByOrderByCheckInTimeDesc();
 }

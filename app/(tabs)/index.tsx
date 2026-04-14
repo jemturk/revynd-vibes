@@ -165,7 +165,7 @@ export default function MapScreen() {
       spotCoords[1], spotCoords[0]  // Spot [Lat, Lng]
     );
 
-    if (distance > 105) {
+    if (distance > 100) {
       triggerAlert(`You're ${Math.round(distance)}m away. Get closer!`, 'warning');
       safeHaptic(Haptics.ImpactFeedbackStyle.Medium);
       return;
