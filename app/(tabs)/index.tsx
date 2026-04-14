@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react';
-import { StyleSheet, View, Text, Alert, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, Text, Alert, TouchableOpacity, ActivityIndicator, Animated } from 'react-native';
 import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Mapbox from '@rnmapbox/maps';
@@ -7,6 +7,7 @@ import Constants from 'expo-constants';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 
 Mapbox.setAccessToken(Constants.expoConfig?.extra?.mapboxPublicToken || '');
 
@@ -43,12 +44,45 @@ export default function MapScreen() {
   const [selectedSpot, setSelectedSpot] = useState<SpotFeature | null>(null);
   const [userCoords, setUserCoords] = useState<[number, number] | null>(null);
   const [sheetIndex, setSheetIndex] = useState(0);
-  const [spots, setSpots] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [currentCity, setCurrentCity] = useState<string | null>(null);
 
+  const [alertConfig, setAlertConfig] = useState<{ msg: string; type: 'error' | 'warning' | 'success' | null }>({ msg: '', type: null });
+  const slideAnim = useRef(new Animated.Value(-100)).current; // Start off-screen
 
+  const safeHaptic = async (style: Haptics.ImpactFeedbackStyle) => {
+    try {
+      // Check if the method exists before calling it
+      if (Haptics && typeof Haptics.impactAsync === 'function') {
+        await Haptics.impactAsync(style);
+      }
+    } catch (error) {
+      // If it fails, the app keeps running and the user just doesn't feel the buzz
+      console.log("Haptics unavailable");
+    }
+  };
+
+  const triggerAlert = (msg: string, type: 'error' | 'warning' | 'success') => {
+    setAlertConfig({ msg, type });
+
+    // Slide down
+    Animated.spring(slideAnim, {
+      toValue: 50, // Final position from top
+      useNativeDriver: true,
+      tension: 50,
+      friction: 8,
+    }).start();
+
+    // Slide back up after 3 seconds
+    setTimeout(() => {
+      Animated.timing(slideAnim, {
+        toValue: -100,
+        duration: 500,
+        useNativeDriver: true,
+      }).start(() => setAlertConfig({ msg: '', type: null }));
+    }, 3000);
+  };
 
   const [featureCollection, setFeatureCollection] = useState({
     type: 'FeatureCollection',
@@ -132,10 +166,8 @@ export default function MapScreen() {
     );
 
     if (distance > 105) {
-      Alert.alert(
-        "Out of Range",
-        `You are ${Math.round(distance)}m away. You must be within 100m to check in!`
-      );
+      triggerAlert(`You're ${Math.round(distance)}m away. Get closer!`, 'warning');
+      safeHaptic(Haptics.ImpactFeedbackStyle.Medium);
       return;
     }
 
@@ -146,12 +178,12 @@ export default function MapScreen() {
       });
 
       if (response.ok) {
-        Alert.alert("Success", "Vibe boosted!");
+        triggerAlert(`You're checked in at ${selectedSpot?.properties.name}!`, 'success')
+        safeHaptic(Haptics.ImpactFeedbackStyle.Light);
         handleRefresh();
       } else if (response.status === 429) {
-        // 🛑 Handle the spam protection error
-        const message = await response.text();
-        Alert.alert("Slow Down", message);
+        triggerAlert("Whoa! Only one check-in per hour at one spot.", 'error');
+        safeHaptic(Haptics.ImpactFeedbackStyle.Medium);
       } else {
         Alert.alert("Error", "Something went wrong on the server.");
       }
@@ -348,10 +380,21 @@ export default function MapScreen() {
                   </Text>
 
                   <View style={styles.spotCard}>
-                    <Text style={styles.vibeText}>
-                      {/* This now updates dynamically when handleRefresh finishes */}
-                      Density: {Math.round(displaySpot.properties.intensity * 100)}%
-                    </Text>
+                    <View style={styles.densityContainer}>
+                      <View style={styles.densityHeader}>
+                        <Text style={styles.densityLabel}>Vibe Crowd</Text>
+                      </View>
+
+                      {/* The Progress Bar */}
+                      <View style={styles.barTrack}>
+                        <View
+                          style={[
+                            styles.barFill,
+                            { width: `${displaySpot.properties.intensity * 100}%` }
+                          ]}
+                        />
+                      </View>
+                    </View>
 
                     <TouchableOpacity
                       style={styles.checkInButton}
@@ -382,6 +425,25 @@ export default function MapScreen() {
             )}
           </BottomSheetView>
         </BottomSheet>
+        <Animated.View style={[
+          styles.customAlert,
+          {
+            transform: [{ translateY: slideAnim }],
+            backgroundColor:
+              alertConfig.type === 'success' ? '#10B981' : // Emerald Green
+                alertConfig.type === 'error' ? '#EF4444' :   // Red
+                  '#F59E0B'
+          }
+        ]}>
+          <MaterialIcons
+            name={alertConfig.type === 'success' ? "check-circle" :
+              alertConfig.type === 'error' ? "block" :
+                "location-off"}
+            size={20}
+            color="white"
+          />
+          <Text style={styles.alertText}>{alertConfig.msg}</Text>
+        </Animated.View>
       </View>
     </GestureHandlerRootView>
   );
@@ -407,14 +469,6 @@ const styles = StyleSheet.create({
     borderRadius: 15
   },
   vibeText: { fontSize: 16, fontWeight: '600' },
-  checkInButton: {
-    marginTop: 15,
-    backgroundColor: '#FB923C',
-    padding: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  buttonText: { color: 'white', fontWeight: 'bold' },
   floatingButton: {
     position: 'absolute',
     right: 20,
@@ -430,5 +484,71 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 10,
+  },
+  customAlert: {
+    position: 'absolute',
+    left: 20,
+    right: 20,
+    padding: 16,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    elevation: 5, // Shadow for Android
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    zIndex: 1000,
+  },
+  alertText: {
+    color: 'white',
+    fontWeight: '600',
+    marginLeft: 10,
+    fontSize: 14,
+  },
+  densityContainer: {
+    width: '100%',
+    marginBottom: 20,
+  },
+  densityHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    marginBottom: 8,
+  },
+  densityLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#4B5563', // Slate grey
+  },
+  barTrack: {
+    height: 12,
+    width: '100%',
+    backgroundColor: '#E5E7EB', // Light grey track
+    borderRadius: 6,
+    overflow: 'hidden',
+  },
+  barFill: {
+    height: '100%',
+    backgroundColor: '#FB923C', // A slightly lighter, "glowing" amber
+    borderRadius: 5,
+    // Add an inner "pulse" look
+    borderRightWidth: 3,
+    borderRightColor: '#FB923C',
+  },
+  checkInButton: {
+    width: '100%',
+    backgroundColor: '#0D9488', // Deep Midnight Slate (Very premium on OLED screens)
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 10,
+    // Elevation for that Pixel 9 Pro depth
+    elevation: 4,
+  },
+  buttonText: {
+    color: 'white',
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    fontSize: 16,
   },
 });
