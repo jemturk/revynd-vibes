@@ -40,7 +40,8 @@ public class CheckInController {
         CheckIn lastCheckIn = checkInRepository.findFirstBySpotIdOrderByCheckInTimeDesc(spotId);
 
         if (lastCheckIn != null) {
-            LocalDateTime limit = LocalDateTime.now().minusHours(1);
+            // LocalDateTime limit = LocalDateTime.now().minusHours(1);
+            LocalDateTime limit = LocalDateTime.now().minusSeconds(1);
             if (lastCheckIn.getCheckInTime().isAfter(limit)) {
                 return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                         .body("Slow down! You can only boost the vibe once per hour.");
