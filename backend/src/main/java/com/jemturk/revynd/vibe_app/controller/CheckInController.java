@@ -48,9 +48,17 @@ public class CheckInController {
             }
         }
 
+        double currentIntensity = spot.getIntensity() != null ? spot.getIntensity() : 0.0;
+        // Add 10% for every new check-in, capping at 1.0 (100%)
+        double updatedIntensity = Math.min(1.0, currentIntensity + 0.1);
+        
+        spot.setIntensity(updatedIntensity);
+        spotRepository.save(spot); // Update the source
+
         // 3. Save the new check-in
         CheckIn checkIn = new CheckIn();
         checkIn.setSpot(spot);
+        checkIn.setIntensityAtTime(spot.getIntensity());
         checkInRepository.save(checkIn);
 
         return ResponseEntity.ok("Check-in successful");
@@ -65,8 +73,8 @@ public class CheckInController {
                         ci.getSpot().getName(),
                         ci.getSpot().getVibe(),
                         ci.getCheckInTime(),
-                        // Using the spot's current intensity or a fixed snapshot
-                        ci.getSpot().getIntensity()))
+                        // Return the intensity that was saved at check-in time, not current
+                        ci.getIntensityAtTime()))
                 .toList();
     }
 

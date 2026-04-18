@@ -8,6 +8,7 @@ import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { useTheme } from '../../theme/ThemeContext';
 
 
 Mapbox.setAccessToken(Constants.expoConfig?.extra?.mapboxPublicToken || '');
@@ -27,6 +28,7 @@ type SpotFeature = {
 };
 
 export default function MapScreen() {
+  const { theme, isDark } = useTheme();
 
   const centerOnUser = () => {
     if (userCoords && cameraRef.current) {
@@ -51,6 +53,109 @@ export default function MapScreen() {
 
   const [alertConfig, setAlertConfig] = useState<{ msg: string; type: 'error' | 'warning' | 'success' | null }>({ msg: '', type: null });
   const slideAnim = useRef(new Animated.Value(-100)).current; // Start off-screen
+
+  const styles = useMemo(() => StyleSheet.create({
+    container: { flex: 1, backgroundColor: theme.background },
+    map: { flex: 1 },
+    sheetBackground: { backgroundColor: theme.card },
+    contentContainer: {
+      paddingHorizontal: 20,
+      paddingTop: 10,
+      paddingBottom: 40,
+      alignItems: 'center'
+    },
+    title: { fontSize: 22, fontWeight: 'bold', color: theme.text },
+    subtitle: { fontSize: 16, fontWeight: '500', color: theme.subtext, marginBottom: 15 },
+    spotCard: {
+      marginTop: 20,
+      width: '100%',
+      padding: 20,
+      backgroundColor: theme.card,
+      borderRadius: 15
+    },
+    vibeText: { fontSize: 16, fontWeight: '600' },
+    floatingButton: {
+      position: 'absolute',
+      right: 20,
+      backgroundColor: theme.card,
+      width: 48,
+      height: 48,
+      borderRadius: 18,
+      elevation: 5,
+      shadowColor: theme.text,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 3.84,
+      justifyContent: 'center',
+      alignItems: 'center',
+      zIndex: 10,
+    },
+    customAlert: {
+      position: 'absolute',
+      left: 20,
+      right: 20,
+      padding: 16,
+      borderRadius: 12,
+      flexDirection: 'row',
+      alignItems: 'center',
+      elevation: 5,
+      shadowColor: theme.text,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      zIndex: 1000,
+    },
+    alertText: {
+      color: 'white',
+      fontWeight: '600',
+      marginLeft: 10,
+      fontSize: 14,
+    },
+    densityContainer: {
+      width: '100%',
+      marginBottom: 20,
+    },
+    densityHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'baseline',
+      marginBottom: 8,
+    },
+    densityLabel: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: theme.subtext,
+    },
+    barTrack: {
+      height: 12,
+      width: '100%',
+      backgroundColor: theme.border,
+      borderRadius: 6,
+      overflow: 'hidden',
+    },
+    barFill: {
+      height: '100%',
+      backgroundColor: '#FB923C', // Keeping orange for now
+      borderRadius: 5,
+      borderRightWidth: 3,
+      borderRightColor: '#FB923C',
+    },
+    checkInButton: {
+      width: '100%',
+      backgroundColor: '#0D9488', // Keeping teal for now
+      paddingVertical: 14,
+      borderRadius: 12,
+      alignItems: 'center',
+      marginTop: 10,
+      elevation: 4,
+    },
+    buttonText: {
+      color: 'white',
+      fontWeight: '700',
+      letterSpacing: 0.5,
+      fontSize: 16,
+    },
+    center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  }), [theme]);
 
   const safeHaptic = async (style: Haptics.ImpactFeedbackStyle) => {
     try {
@@ -246,7 +351,7 @@ export default function MapScreen() {
   if (isLoading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#FB923C" />
+        <ActivityIndicator size="large" color={theme.primary} />
       </View>
     );
   }
@@ -255,8 +360,8 @@ export default function MapScreen() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <>
         <StatusBar
-          barStyle="dark-content" // This makes battery/wifi/clock icons black/dark grey
-          backgroundColor="transparent" // Keeps it seamless with your header
+          barStyle={isDark ? "light-content" : "dark-content"}
+          backgroundColor="transparent"
           translucent={true}
         />
       </>
@@ -270,7 +375,7 @@ export default function MapScreen() {
           compassEnabled={true}
           compassPosition={{ top: 45, left: 35 }}
           style={styles.map}
-          styleURL={Mapbox.StyleURL.Light}
+          styleURL={isDark ? Mapbox.StyleURL.Dark : Mapbox.StyleURL.Light}
           onPress={() => {
             setSelectedSpot(null);
             bottomSheetRef.current?.snapToIndex(0);
@@ -336,7 +441,7 @@ export default function MapScreen() {
           activeOpacity={0.7}
           pointerEvents={sheetIndex === 2 ? 'none' : 'auto'}
         >
-          <MaterialIcons name="my-location" size={24} color="#374151" />
+          <MaterialIcons name="my-location" size={24} color={theme.subtext} />
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -346,7 +451,7 @@ export default function MapScreen() {
               // Position it exactly 60px (button height + gap) above the find-me button
               bottom: buttonBottom + 64,
               opacity: sheetIndex === 2 ? 0 : 1,
-              backgroundColor: '#FB923C' // Distinct color for refresh
+              backgroundColor: theme.primary // Distinct color for refresh
             }
           ]}
           onPress={handleRefresh}
@@ -422,7 +527,7 @@ export default function MapScreen() {
                   <MaterialIcons
                     name="map"
                     size={24}
-                    color="#3ca5fb"
+                    color={theme.primary}
                     style={{ marginLeft: 8 }}
                   />
                 </View>
@@ -456,107 +561,3 @@ export default function MapScreen() {
     </GestureHandlerRootView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: 'black' },
-  map: { flex: 1 },
-  sheetBackground: { backgroundColor: '#FFFBEB' },
-  contentContainer: {
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 40,
-    alignItems: 'center'
-  },
-  title: { fontSize: 22, fontWeight: 'bold', color: '#1F2937' },
-  subtitle: { fontSize: 16, fontWeight: '500', color: '#6B7280', marginBottom: 15 },
-  spotCard: {
-    marginTop: 20,
-    width: '100%',
-    padding: 20,
-    backgroundColor: 'white',
-    borderRadius: 15
-  },
-  vibeText: { fontSize: 16, fontWeight: '600' },
-  floatingButton: {
-    position: 'absolute',
-    right: 20,
-    backgroundColor: 'white',
-    width: 48,           // Fixed width and height ensures 
-    height: 48,          // they stay square
-    borderRadius: 18,    // Lower value = Square with rounded corners
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 10,
-  },
-  customAlert: {
-    position: 'absolute',
-    left: 20,
-    right: 20,
-    padding: 16,
-    borderRadius: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    elevation: 5, // Shadow for Android
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    zIndex: 1000,
-  },
-  alertText: {
-    color: 'white',
-    fontWeight: '600',
-    marginLeft: 10,
-    fontSize: 14,
-  },
-  densityContainer: {
-    width: '100%',
-    marginBottom: 20,
-  },
-  densityHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-    marginBottom: 8,
-  },
-  densityLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#4B5563', // Slate grey
-  },
-  barTrack: {
-    height: 12,
-    width: '100%',
-    backgroundColor: '#E5E7EB', // Light grey track
-    borderRadius: 6,
-    overflow: 'hidden',
-  },
-  barFill: {
-    height: '100%',
-    backgroundColor: '#FB923C', // A slightly lighter, "glowing" amber
-    borderRadius: 5,
-    // Add an inner "pulse" look
-    borderRightWidth: 3,
-    borderRightColor: '#FB923C',
-  },
-  checkInButton: {
-    width: '100%',
-    backgroundColor: '#0D9488', // Deep Midnight Slate (Very premium on OLED screens)
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginTop: 10,
-    // Elevation for that Pixel 9 Pro depth
-    elevation: 4,
-  },
-  buttonText: {
-    color: 'white',
-    fontWeight: '700',
-    letterSpacing: 0.5,
-    fontSize: 16,
-  },
-});

@@ -7,5 +7,5 @@ public record CheckInRecord(
     String spotName,
     String vibe,
     LocalDateTime checkInTime,
-    double intensityAtTime
+    Double intensityAtTime
 ) {}

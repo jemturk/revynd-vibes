@@ -3,7 +3,7 @@ package com.jemturk.revynd.vibe_app.model;
 import java.time.LocalDateTime;
 
 import jakarta.persistence.Id;
-
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -26,10 +26,13 @@ public class CheckIn {
 
     private LocalDateTime checkInTime;
 
+    @Column(name = "intensity_at_time")
+    private Double intensityAtTime;
+
     @PrePersist
     protected void onCreate() {
         checkInTime = LocalDateTime.now();
     }
-    
+
     // We'll add User user; later once we handle Auth
 }

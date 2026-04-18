@@ -10,7 +10,6 @@ import com.jemturk.revynd.vibe_app.model.CheckIn;
 
 import org.springframework.stereotype.Repository;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
@@ -36,4 +35,10 @@ public interface CheckInRepository extends JpaRepository<CheckIn, Long> {
     CheckIn findFirstBySpotIdOrderByCheckInTimeDesc(Long spotId);
     
     List<CheckIn> findAllByOrderByCheckInTimeDesc();
+
+    /**
+     * Find all check-ins after a specific time.
+     * Used by IntensityDecayService to identify spots that need intensity decay.
+     */
+    List<CheckIn> findByCheckInTimeAfter(LocalDateTime time);
 }

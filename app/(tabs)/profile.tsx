@@ -1,32 +1,45 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useTheme, AppTheme } from '../../theme/ThemeContext';
 
-const AccountScreen = () => {
-  // We'll eventually pull this from a Global State or Auth Context
-  const user = {
-    name: "Kemal Cem Unturk",
-    email: "kemal@example.com", // Replace with your actual email
-    memberSince: "2024"
-  };
+type AccountItemProps = {
+  icon: React.ComponentProps<typeof MaterialIcons>['name'];
+  label: string;
+  onPress?: () => void;
+  rightElement?: React.ReactNode;
+};
 
-  const [isDarkMode, setIsDarkMode] = React.useState(false);
+const AccountItem = ({ icon, label, onPress, rightElement }: AccountItemProps) => {
+  const { theme } = useTheme();
+  const styles = makeStyles(theme);
 
-  const AccountItem = ({ icon, label, onPress, rightElement }: any) => (
+  return (
     <TouchableOpacity style={styles.item} onPress={onPress} disabled={!onPress}>
       <View style={styles.itemLeft}>
         <View style={styles.iconWrapper}>
-          <MaterialIcons name={icon} size={22} color="#64748B" />
+          <MaterialIcons name={icon} size={22} color={theme.subtext} />
         </View>
         <Text style={styles.itemLabel}>{label}</Text>
       </View>
-      {rightElement ? rightElement : <MaterialIcons name="chevron-right" size={24} color="#CBD5E1" />}
+      {rightElement ?? <MaterialIcons name="chevron-right" size={24} color={theme.border} />}
     </TouchableOpacity>
   );
+};
+
+const AccountScreen = () => {
+  const { theme, isDark, toggleTheme } = useTheme();
+  const styles = makeStyles(theme);
+
+  // We'll eventually pull this from a Global State or Auth Context
+  const user = {
+    name: "Jem Turk",
+    email: "JemTurk@gmail.com",
+    memberSince: "2024",
+  };
 
   return (
     <ScrollView style={styles.container}>
-      {/* Profile Header */}
       <View style={styles.header}>
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>{user.name.charAt(0)}</Text>
@@ -35,62 +48,73 @@ const AccountScreen = () => {
         <Text style={styles.userEmail}>{user.email}</Text>
       </View>
 
-      {/* App Settings */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>App Settings</Text>
-        <AccountItem 
-          icon="brightness-6" 
-          label="Dark Mode" 
+        <AccountItem
+          icon="brightness-6"
+          label="Dark Mode"
           rightElement={
-            <Switch 
-              value={isDarkMode} 
-              onValueChange={setIsDarkMode}
-              trackColor={{ false: '#CBD5E1', true: '#3ca5fb' }}
+            <Switch
+              value={isDark}
+              onValueChange={toggleTheme}
+              // 'true' is the color when the switch is ON
+              // 'false' is the color when the switch is OFF
+              trackColor={{
+                false: '#94A3B8', // A muted slate-grey for the "off" track
+                true: '#639cec'   // Your Revynd Orange for the "on" track
+              }}
+              // thumbColor is the moving circle. 
+              // We'll make it white when active to pop against the orange.
+              thumbColor={isDark ? '#FB923C' : '#F4F3F4'}
+              // Android specific: ensures the circle stays white even while being pressed
+              ios_backgroundColor="#CBD5E1"
             />
-          } 
+          }
         />
-        <AccountItem icon="notifications-none" label="Notifications" onPress={() => {}} />
+        <AccountItem icon="notifications-none" label="Notifications" onPress={() => { }} />
       </View>
 
-      {/* Account Actions */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Account</Text>
-        <AccountItem icon="person-outline" label="Edit Profile" onPress={() => {}} />
-        <AccountItem icon="security" label="Privacy Policy" onPress={() => {}} />
-        <AccountItem icon="exit-to-app" label="Sign Out" onPress={() => {}} />
+        <AccountItem icon="person-outline" label="Edit Profile" onPress={() => { }} />
+        <AccountItem icon="security" label="Privacy Policy" onPress={() => { }} />
+        <AccountItem icon="exit-to-app" label="Sign Out" onPress={() => { }} />
       </View>
-      
+
       <Text style={styles.versionText}>Version 1.0.4</Text>
     </ScrollView>
   );
 };
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
+const makeStyles = (theme: AppTheme) => StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: theme.background,
+  },
   header: {
     alignItems: 'center',
     paddingVertical: 40,
-    backgroundColor: 'white',
+    backgroundColor: theme.card,
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    borderBottomColor: theme.border,
   },
   avatar: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#3ca5fb',
+    backgroundColor: theme.primary,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
   },
   avatarText: { color: 'white', fontSize: 32, fontWeight: '800' },
-  userName: { fontSize: 20, fontWeight: '700', color: '#1E293B' },
-  userEmail: { fontSize: 14, color: '#64748B', marginTop: 4 },
+  userName: { fontSize: 20, fontWeight: '700', color: theme.text },
+  userEmail: { fontSize: 14, color: theme.subtext, marginTop: 4 },
   section: { marginTop: 24, paddingHorizontal: 16 },
-  sectionTitle: { 
-    fontSize: 13, 
-    fontWeight: '700', 
-    color: '#94A3B8', 
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: theme.subtext,
     textTransform: 'uppercase',
     letterSpacing: 1,
     marginBottom: 8,
@@ -100,21 +124,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: 'white',
+    backgroundColor: theme.card,
     padding: 16,
     borderRadius: 12,
     marginBottom: 8,
   },
   itemLeft: { flexDirection: 'row', alignItems: 'center' },
   iconWrapper: { marginRight: 12 },
-  itemLabel: { fontSize: 16, color: '#334155', fontWeight: '500' },
+  itemLabel: { fontSize: 16, color: theme.text, fontWeight: '500' },
   versionText: {
     textAlign: 'center',
-    color: '#94A3B8',
+    color: theme.subtext,
     fontSize: 12,
     marginTop: 40,
     marginBottom: 20,
-  }
+  },
 });
 
 export default AccountScreen;

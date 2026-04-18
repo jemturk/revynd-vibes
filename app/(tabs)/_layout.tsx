@@ -1,74 +1,58 @@
-import React from 'react';
 import { Tabs } from 'expo-router';
+import { useTheme, AppTheme } from '../../theme/ThemeContext';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Platform } from 'react-native';
 
 export default function TabLayout() {
+  const { theme } = useTheme();
+
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: '#FB923C', // Revynd Orange
-        tabBarInactiveTintColor: '#9CA3AF', // Gray 400
-        headerShown: true,
+        // This fixes the Tab Bar background
+        tabBarStyle: {
+          backgroundColor: theme.cardLighter,
+          borderTopColor: theme.border,
+          // 1. Increase height (default is usually ~50-60)
+          height: 85,
+          // 2. Add padding to keep icons from hitting the bottom edge
+          paddingBottom: 12,
+          paddingTop: 8,
+          // 3. Optional: Remove the shadow/border for a flatter look
+          elevation: 0,
+          borderTopWidth: 1,
+        },
+        // This fixes the Header background
         headerStyle: {
-          backgroundColor: '#FFFBEB', // Revynd Cream
-          elevation: 0, // Remove Android shadow for a flat look
-          shadowOpacity: 0,
+          backgroundColor: theme.cardLighter,
         },
         headerTitleStyle: {
-          fontWeight: '800',
-          fontSize: 20,
-          color: '#1F2937',
-          letterSpacing: 1.2,
+          color: theme.text,
         },
-        tabBarStyle: {
-          backgroundColor: '#FFFFFF',
-          borderTopWidth: 1,
-          borderTopColor: '#F3F4F6', // Subtle separator
-
-          // INCREASED DIMENSIONS
-          height: Platform.OS === 'android' ? 85 : 95, // Tall enough to feel substantial
-          paddingBottom: Platform.OS === 'android' ? 25 : 35, // This is what "lifts" the icons up
-          paddingTop: 10,
-
-          // Optional: keep a little shadow/elevation
-          elevation: 8,
-        },
-        tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: '600',
-          marginTop: 2, // Fine-tune the gap between icon and text
-        },
+        tabBarActiveTintColor: '#FB923C', // Revynd Orange
+        tabBarInactiveTintColor: '#94A3B8',
+        headerShown: true, // If you want the title at the top
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
-          title: 'REVYND',
-          tabBarLabel: 'Explore',
-          tabBarIcon: ({ color, size }) => (
-            <MaterialIcons name="explore" size={size + 4} color={color} />
-          ),
+          title: 'Map',
+          headerTitle: 'RVYND',
+          tabBarIcon: ({ color }) => <MaterialIcons name="map" size={26} color={color} />,
         }}
       />
       <Tabs.Screen
         name="history"
         options={{
-          title: 'ACTIVITY',
-          tabBarLabel: 'History',
-          tabBarIcon: ({ color, size }) => (
-            <MaterialIcons name="history" size={size + 4} color={color} />
-          ),
+          title: 'History',
+          tabBarIcon: ({ color }) => <MaterialIcons name="history" size={26} color={color} />,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'ACCOUNT',
-          tabBarLabel: 'Profile',
-          tabBarIcon: ({ color, size }) => (
-            <MaterialIcons name="person-outline" size={size + 4} color={color} />
-          ),
+          title: 'Account',
+          tabBarIcon: ({ color }) => <MaterialIcons name="person" size={26} color={color} />,
         }}
       />
     </Tabs>

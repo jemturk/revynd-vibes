@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { Swipeable } from 'react-native-gesture-handler';
 import { useFocusEffect } from '@react-navigation/native';
 import Animated, { FadeOutLeft, LinearTransition } from 'react-native-reanimated';
+import { useTheme } from '../../theme/ThemeContext';
 
 interface CheckInRecord {
   id: number;
@@ -25,11 +26,97 @@ interface CheckInRecord {
 const API_URL = 'http://192.168.1.223:8080/api';
 
 const HistoryScreen = () => {
+  const { theme } = useTheme();
   const [history, setHistory] = useState<CheckInRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const swipeableRefs = useRef<{ [key: number]: Swipeable | null }>({});
+
+  const styles = useMemo(() => StyleSheet.create({
+    container: { flex: 1, backgroundColor: theme.background },
+    center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    header: {
+      paddingTop: 40,
+      paddingHorizontal: 20,
+      paddingBottom: 20,
+      backgroundColor: theme.card,
+    },
+    headerTitle: { fontSize: 28, fontWeight: '800', color: theme.text },
+    headerSubtitle: { fontSize: 14, color: theme.subtext, marginTop: 4 },
+    listContent: { paddingHorizontal: 5, paddingVertical: 25 },
+    historyCard: {
+      backgroundColor: theme.card,
+      borderRadius: 20,
+      paddingVertical: 20,
+      paddingHorizontal: 16,
+      borderWidth: 1,
+      borderColor: theme.border,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between'
+    },
+    cardLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+    iconCircle: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor: theme.border,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 14,
+    },
+    spotName: {
+      fontSize: 17,
+      fontWeight: '700',
+      color: theme.text
+    },
+    vibeType: { fontSize: 13, color: theme.subtext, marginTop: 2 },
+    timeText: {
+      fontSize: 11,
+      color: theme.subtext,
+      marginTop: 6,
+      fontWeight: '600',
+    },
+    intensityWrapper: { alignItems: 'flex-end' },
+    miniBarTrack: {
+      width: 40,
+      height: 6,
+      backgroundColor: theme.border,
+      borderRadius: 3,
+      overflow: 'hidden',
+    },
+    miniBarFill: { height: '100%', backgroundColor: '#FB923C' }, // Keeping orange for now
+    emptyState: { alignItems: 'center', marginTop: 100 },
+    emptyText: { color: theme.subtext, marginTop: 12, fontSize: 16 },
+    deleteAction: {
+      backgroundColor: '#EF4444', // Keeping red for delete
+      justifyContent: 'center',
+      alignItems: 'center',
+      width: 80,
+      height: '100%',
+      borderRadius: 16,
+      marginLeft: 12,
+    },
+    deleteActionText: {
+      color: 'white',
+      fontWeight: '700',
+      fontSize: 12,
+      marginTop: 4,
+    },
+    itemWrapper: {
+      marginBottom: 12,
+      marginHorizontal: 16,
+    },
+    shadowWrapper: {
+      // Add shadow for better visibility
+      shadowColor: theme.text,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 3,
+    },
+  }), [theme]);
 
   const fetchHistory = async (): Promise<CheckInRecord[]> => {
     // Only show the big center spinner if the list is totally empty
@@ -112,6 +199,7 @@ const HistoryScreen = () => {
 
   const renderItem = ({ item }: { item: CheckInRecord }) => {
     const date = new Date(item.checkInTime);
+    const percentage = Number(item.intensityAtTime) * 100;
 
     return (
       <Animated.View
@@ -122,7 +210,7 @@ const HistoryScreen = () => {
         style={styles.itemWrapper}
       >
         <Swipeable
-          ref={(ref) => (swipeableRefs.current[item.id] = ref)}
+          ref={(ref) => { swipeableRefs.current[item.id] = ref; }}
           renderRightActions={() => renderRightActions(item.id)}
           friction={2}
           rightThreshold={40}
@@ -149,7 +237,7 @@ const HistoryScreen = () => {
             <View style={styles.historyCard}>
               <View style={styles.cardLeft}>
                 <View style={styles.iconCircle}>
-                  <MaterialIcons name="place" size={20} color="#64748B" />
+                  <MaterialIcons name="place" size={20} color={theme.subtext} />
                 </View>
                 <View>
                   <Text style={styles.spotName}>{item.spotName}</Text>
@@ -169,7 +257,7 @@ const HistoryScreen = () => {
                   <View
                     style={[
                       styles.miniBarFill,
-                      { width: `${item.intensityAtTime * 100}%` },
+                      { width: `${Math.min(Math.max(percentage, 0), 100)}%` },
                     ]}
                   />
                 </View>
@@ -184,7 +272,7 @@ const HistoryScreen = () => {
   if (loading && !refreshing) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#3ca5fb" />
+        <ActivityIndicator size="large" color={theme.primary} />
       </View>
     );
   }
@@ -207,12 +295,12 @@ const HistoryScreen = () => {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor="#3ca5fb"
+            tintColor={theme.primary}
           />
         }
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <MaterialIcons name="history" size={48} color="#CBD5E1" />
+            <MaterialIcons name="history" size={48} color={theme.subtext} />
             <Text style={styles.emptyText}>
               No check-ins yet.
             </Text>
@@ -222,82 +310,5 @@ const HistoryScreen = () => {
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: {
-    paddingTop: 40,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-    backgroundColor: 'white',
-  },
-  headerTitle: { fontSize: 28, fontWeight: '800', color: '#1E293B' },
-  headerSubtitle: { fontSize: 14, color: '#64748B', marginTop: 4 },
-  listContent: { paddingHorizontal: 5, paddingVertical: 25  },
-  historyCard: {
-    backgroundColor: 'white',
-    borderRadius: 20,
-    paddingVertical: 20,
-    paddingHorizontal: 16,
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between'
-  },
-  cardLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-  iconCircle: {
-    width: 48,  // Increased from 40
-    height: 48, // Increased from 40
-    borderRadius: 24,
-    backgroundColor: '#F1F5F9',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 14,
-  },
-  spotName: {
-    fontSize: 17, // Slight bump from 16
-    fontWeight: '700',
-    color: '#334155'
-  },
-  vibeType: { fontSize: 13, color: '#64748B', marginTop: 2 },
-  timeText: {
-    fontSize: 11,
-    color: '#94A3B8',
-    marginTop: 6,
-    fontWeight: '600',
-  },
-  intensityWrapper: { alignItems: 'flex-end' },
-  miniBarTrack: {
-    width: 40,
-    height: 6,
-    backgroundColor: '#E2E8F0',
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  miniBarFill: { height: '100%', backgroundColor: '#FB923C' },
-  emptyState: { alignItems: 'center', marginTop: 100 },
-  emptyText: { color: '#94A3B8', marginTop: 12, fontSize: 16 },
-  deleteAction: {
-    backgroundColor: '#EF4444',
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: 80,
-    height: '100%',
-    borderRadius: 16,
-    marginLeft: 12,
-  },
-  deleteActionText: {
-    color: 'white',
-    fontWeight: '700',
-    fontSize: 12,
-    marginTop: 4,
-  },
-  itemWrapper: {
-    marginBottom: 12, // This is the space that will collapse
-    marginHorizontal: 16,
-  },
-});
 
 export default HistoryScreen;
