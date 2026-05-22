@@ -1,7 +1,8 @@
-import React, { useCallback } from 'react';
+import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme, AppTheme } from '../../theme/ThemeContext';
+import { useAuth } from '../_layout'; 
 
 type AccountItemProps = {
   icon: React.ComponentProps<typeof MaterialIcons>['name'];
@@ -10,6 +11,7 @@ type AccountItemProps = {
   rightElement?: React.ReactNode;
 };
 
+// 1. Re-declare the isolated Account Row item
 const AccountItem = ({ icon, label, onPress, rightElement }: AccountItemProps) => {
   const { theme } = useTheme();
   const styles = makeStyles(theme);
@@ -29,23 +31,20 @@ const AccountItem = ({ icon, label, onPress, rightElement }: AccountItemProps) =
 
 const AccountScreen = () => {
   const { theme, isDark, toggleTheme } = useTheme();
+  const { user, signOut } = useAuth(); // 👈 Consuming real session info
   const styles = makeStyles(theme);
-
-  // We'll eventually pull this from a Global State or Auth Context
-  const user = {
-    name: "Jem Turk",
-    email: "JemTurk@gmail.com",
-    memberSince: "2024",
-  };
 
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
         <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{user.name.charAt(0)}</Text>
+          <Text style={styles.avatarText}>
+            {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
+          </Text>
         </View>
-        <Text style={styles.userName}>{user.name}</Text>
-        <Text style={styles.userEmail}>{user.email}</Text>
+        {/* Dynamic Name and Email bound to whoever logged in */}
+        <Text style={styles.userName}>{user?.name || "Active Session"}</Text>
+        <Text style={styles.userEmail}>{user?.email || "No Email Session Linked"}</Text>
       </View>
 
       <View style={styles.section}>
@@ -57,16 +56,11 @@ const AccountScreen = () => {
             <Switch
               value={isDark}
               onValueChange={toggleTheme}
-              // 'true' is the color when the switch is ON
-              // 'false' is the color when the switch is OFF
               trackColor={{
-                false: '#94A3B8', // A muted slate-grey for the "off" track
-                true: '#639cec'   // Your Revynd Orange for the "on" track
+                false: '#94A3B8', 
+                true: '#639cec'   
               }}
-              // thumbColor is the moving circle. 
-              // We'll make it white when active to pop against the orange.
               thumbColor={isDark ? '#FB923C' : '#F4F3F4'}
-              // Android specific: ensures the circle stays white even while being pressed
               ios_backgroundColor="#CBD5E1"
             />
           }
@@ -78,7 +72,7 @@ const AccountScreen = () => {
         <Text style={styles.sectionTitle}>Account</Text>
         <AccountItem icon="person-outline" label="Edit Profile" onPress={() => { }} />
         <AccountItem icon="security" label="Privacy Policy" onPress={() => { }} />
-        <AccountItem icon="exit-to-app" label="Sign Out" onPress={() => { }} />
+        <AccountItem icon="exit-to-app" label="Sign Out" onPress={signOut} />
       </View>
 
       <Text style={styles.versionText}>Version 1.0.4</Text>
@@ -86,6 +80,7 @@ const AccountScreen = () => {
   );
 };
 
+// 2. Restored the missing stylesheet generator factory function
 const makeStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
@@ -102,7 +97,7 @@ const makeStyles = (theme: AppTheme) => StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: theme.primary,
+    backgroundColor: theme.primary || '#FB923C',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,

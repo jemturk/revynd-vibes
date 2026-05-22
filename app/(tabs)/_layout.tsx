@@ -37,7 +37,7 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Map',
-          headerTitle: 'RVYND',
+          headerTitle: 'REVYND',
           tabBarIcon: ({ color }) => <MaterialIcons name="map" size={26} color={color} />,
         }}
       />
