@@ -20,15 +20,18 @@ export default {
       "bundleIdentifier": "com.jemturk.revynd"
     },
     "android": {
-      "package": "com.revynd", // 👈 Consolidated your unique branding package name here
+      "package": "com.jemturk.revynd", // 👈 Consolidated your unique branding package name here
       "kotlinVersion": "1.9.24",       // 👈 Brought your custom kotlin engine target inside the bundle
       "edgeToEdgeEnabled": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "permissions": [                 // 👈 CRITICAL: Force-opens Android external network access paths
-        "INTERNET"
+      "permissions": [
+        "USE_BIOMETRIC",
+        "ACCESS_COARSE_LOCATION", // 👈 Allows approximation mapping data cells
+        "ACCESS_FINE_LOCATION",   // 👈 Allows high-fidelity GPS pin tracking
+        "FOREGROUND_SERVICE"      // 👈 Required if tracking pins while screen is active
       ]
     },
     "web": {
@@ -53,7 +56,10 @@ export default {
       ]
     ],
     "extra": {
-      "mapboxPublicToken": process.env.MAPBOX_PUBLIC_TOKEN
+      "mapboxPublicToken": process.env.MAPBOX_PUBLIC_TOKEN,
+      "eas": {
+        "projectId": "f1eed0d4-a40c-46d0-893d-623ab84ce296"
+      }
     }
   }
 };

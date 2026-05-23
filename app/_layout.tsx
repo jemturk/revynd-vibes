@@ -3,7 +3,8 @@ import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ThemeProvider } from '../theme/ThemeContext';
 import { useEffect, useState, createContext, useContext } from 'react';
-
+import Constants from 'expo-constants';
+import Mapbox from '@rnmapbox/maps';
 // Define a structured User type
 export type UserSession = {
   name: string;
@@ -17,6 +18,16 @@ const AuthContext = createContext<{
 } | null>(null);
 
 export const useAuth = () => useContext(AuthContext)!;
+
+
+// Fetch the securely compiled token straight out of your app config's extra block
+const publicToken = Constants.expoConfig?.extra?.mapboxPublicToken;
+
+if (publicToken) {
+  Mapbox.setAccessToken(publicToken);
+} else {
+  console.warn("Mapbox Token missing from Expo Constants configuration framework.");
+}
 
 export default function Layout() {
   const [user, setUser] = useState<UserSession>(null);
