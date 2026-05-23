@@ -1,14 +1,6 @@
 import 'dotenv/config';
 
 export default {
-  android: {
-    package: "com.jemturk.revynd", // Change this to your preferred unique name
-    kotlinVersion: "1.9.24",
-    adaptiveIcon: {
-      foregroundImage: "./assets/adaptive-icon.png",
-      backgroundColor: "#ffffff"
-    }
-  },
   "expo": {
     "name": "RevyndApp",
     "slug": "RevyndApp",
@@ -25,21 +17,26 @@ export default {
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.RevyndApp"
+      "bundleIdentifier": "com.jemturk.revynd"
     },
     "android": {
+      "package": "com.revynd", // 👈 Consolidated your unique branding package name here
+      "kotlinVersion": "1.9.24",       // 👈 Brought your custom kotlin engine target inside the bundle
+      "edgeToEdgeEnabled": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true,
-      "package": "com.anonymous.RevyndApp"
+      "permissions": [                 // 👈 CRITICAL: Force-opens Android external network access paths
+        "INTERNET"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
       "expo-router",
+      "expo-secure-store",
       [
         "@rnmapbox/maps",
         {
@@ -55,8 +52,8 @@ export default {
         }
       ]
     ],
-    extra: {
-      mapboxPublicToken: process.env.MAPBOX_PUBLIC_TOKEN
+    "extra": {
+      "mapboxPublicToken": process.env.MAPBOX_PUBLIC_TOKEN
     }
   }
 };

@@ -23,13 +23,12 @@ interface CheckInRecord {
   intensityAtTime: number;
 }
 
-const API_URL = 'http://192.168.1.223:8080/api';
-
 const HistoryScreen = () => {
   const { theme } = useTheme();
   const [history, setHistory] = useState<CheckInRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const API_URL = 'https://revynd-api-939729691035.us-east1.run.app';
 
   const swipeableRefs = useRef<{ [key: number]: Swipeable | null }>({});
 
@@ -86,11 +85,11 @@ const HistoryScreen = () => {
       borderRadius: 3,
       overflow: 'hidden',
     },
-    miniBarFill: { height: '100%', backgroundColor: '#FB923C' }, // Keeping orange for now
+    miniBarFill: { height: '100%', backgroundColor: '#FB923C' },
     emptyState: { alignItems: 'center', marginTop: 100 },
     emptyText: { color: theme.subtext, marginTop: 12, fontSize: 16 },
     deleteAction: {
-      backgroundColor: '#EF4444', // Keeping red for delete
+      backgroundColor: '#EF4444',
       justifyContent: 'center',
       alignItems: 'center',
       width: 80,
@@ -109,7 +108,6 @@ const HistoryScreen = () => {
       marginHorizontal: 16,
     },
     shadowWrapper: {
-      // Add shadow for better visibility
       shadowColor: theme.text,
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.1,
@@ -119,7 +117,6 @@ const HistoryScreen = () => {
   }), [theme]);
 
   const fetchHistory = async (): Promise<CheckInRecord[]> => {
-    // Only show the big center spinner if the list is totally empty
     if (history.length === 0) {
       setLoading(true);
     }
@@ -139,12 +136,8 @@ const HistoryScreen = () => {
 
   useFocusEffect(
     useCallback(() => {
-      // This runs every time you switch to this tab
       fetchHistory().then(setHistory);
-
-      return () => {
-        // Optional: Clean up anything if the user leaves the tab
-      };
+      return () => {};
     }, [])
   );
 
@@ -164,21 +157,17 @@ const HistoryScreen = () => {
   };
 
   const handleDelete = async (id: number) => {
-    // 1. Visually close the drawer first
     swipeableRefs.current[id]?.close();
 
-    // 2. Wait for the animation (approx 200ms) BEFORE touching the state
     setTimeout(async () => {
       const previous = history;
-
-      // 3. Update state AFTER the row has visually "reset"
       setHistory(prev => prev.filter(item => item.id !== id));
 
       try {
         await deleteCheckIn(id);
         delete swipeableRefs.current[id];
       } catch (error) {
-        setHistory(previous); // Rollback
+        setHistory(previous);
         Alert.alert('Error', 'Could not delete from server.');
       }
     }, 200);
@@ -194,18 +183,13 @@ const HistoryScreen = () => {
     </TouchableOpacity>
   );
 
-  const openRowRef = useRef<Swipeable | null>(null);
-
-
   const renderItem = ({ item }: { item: CheckInRecord }) => {
     const date = new Date(item.checkInTime);
     const percentage = Number(item.intensityAtTime) * 100;
 
     return (
       <Animated.View
-        // This handles the "Slide out" to the left when deleted
         exiting={FadeOutLeft.duration(300)}
-        // This makes the other cards slide up smoothly to fill the gap
         layout={LinearTransition.springify().damping(50)}
         style={styles.itemWrapper}
       >
@@ -216,7 +200,6 @@ const HistoryScreen = () => {
           rightThreshold={40}
           overshootRight={false}
           onSwipeableOpen={() => {
-            // 1. Close all other rows immediately
             Object.keys(swipeableRefs.current).forEach((key) => {
               const rowId = parseInt(key);
               if (rowId !== item.id) {
@@ -224,13 +207,11 @@ const HistoryScreen = () => {
               }
             });
 
-            // 2. Set the auto-close timer for THIS specific row
-            // We don't clear the timer here because we want it to run its course
             setTimeout(() => {
               if (swipeableRefs.current[item.id]) {
                 swipeableRefs.current[item.id]?.close();
               }
-            }, 1500); // 3 seconds
+            }, 1500);
           }}
         >
           <View style={styles.shadowWrapper}>
