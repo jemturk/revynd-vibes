@@ -13,6 +13,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { Swipeable } from 'react-native-gesture-handler';
 import { useFocusEffect } from '@react-navigation/native';
 import Animated, { FadeOutLeft, LinearTransition } from 'react-native-reanimated';
+import * as SecureStore from 'expo-secure-store';
 import { useTheme } from '../../theme/ThemeContext';
 
 interface CheckInRecord {
@@ -116,14 +117,50 @@ const HistoryScreen = () => {
     },
   }), [theme]);
 
+  const buildAuthHeaders = async (contentType?: string) => {
+    const token = await SecureStore.getItemAsync('user_token');
+    return {
+      Accept: 'application/json',
+      ...(contentType ? { 'Content-Type': contentType } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
+  };
+
   const fetchHistory = async (): Promise<CheckInRecord[]> => {
     if (history.length === 0) {
       setLoading(true);
     }
 
     try {
-      const response = await fetch(`${API_URL}/checkins/history`);
-      const data = await response.json();
+      const response = await fetch(`${API_URL}/api/checkins/history`, {
+        headers: await buildAuthHeaders(),
+      });
+
+      const rawText = await response.text();
+      let data: any = [];
+
+      if (rawText) {
+        try {
+          data = JSON.parse(rawText);
+        } catch (jsonError) {
+          console.error('History payload parse failed:', jsonError);
+          if (!response.ok) {
+            return [];
+          }
+          throw new Error('Invalid history response format.');
+        }
+      }
+
+      if (!response.ok) {
+        console.error('History fetch failed with status', response.status, data?.message || rawText);
+        return [];
+      }
+
+      if (!Array.isArray(data)) {
+        console.error('Unexpected history payload shape:', data);
+        return [];
+      }
+
       return data;
     } catch (error) {
       console.error('History fetch failed:', error);
@@ -147,8 +184,9 @@ const HistoryScreen = () => {
   }, []);
 
   const deleteCheckIn = async (id: number) => {
-    const response = await fetch(`${API_URL}/checkins/history/${id}`, {
+    const response = await fetch(`${API_URL}/api/checkins/history/${id}`, {
       method: 'DELETE',
+      headers: await buildAuthHeaders(),
     });
 
     if (!response.ok) {

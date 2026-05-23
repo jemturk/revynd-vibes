@@ -3,29 +3,25 @@ import { StyleSheet, View, Text, Alert, TouchableOpacity, ActivityIndicator, Ani
 import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Mapbox from '@rnmapbox/maps';
+import type { Feature, FeatureCollection, Point } from 'geojson';
 import Constants from 'expo-constants';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../../theme/ThemeContext';
 
+const API_URL = 'https://revynd-api-939729691035.us-east1.run.app';
 
 Mapbox.setAccessToken(Constants.expoConfig?.extra?.mapboxPublicToken || '');
 
-type SpotFeature = {
-  type: 'Feature';
-  properties: {
-    id: string;
-    name: string;
-    vibe: string;
-    intensity: number;
-  };
-  geometry: {
-    type: 'Point';
-    coordinates: [number, number]; // [lng, lat]
-  };
-};
+type SpotFeature = Feature<Point, {
+  id: string;
+  name: string;
+  vibe: string;
+  intensity: number;
+}>;
 
 export default function MapScreen() {
   const { theme, isDark } = useTheme();
@@ -39,6 +35,15 @@ export default function MapScreen() {
   };
 
   const NYC_COORDS: [number, number] = [-74.0060, 40.7128];
+
+  const buildAuthHeaders = async (contentType?: string) => {
+    const token = await SecureStore.getItemAsync('user_token');
+    return {
+      Accept: 'application/json',
+      ...(contentType ? { 'Content-Type': contentType } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
+  };
 
   const cameraRef = useRef<Mapbox.Camera>(null);
   const bottomSheetRef = useRef<BottomSheet>(null);
@@ -190,19 +195,35 @@ export default function MapScreen() {
     }, 3000);
   };
 
-  const [featureCollection, setFeatureCollection] = useState({
+  const [featureCollection, setFeatureCollection] = useState<FeatureCollection<Point, {
+    id: string;
+    name: string;
+    vibe: string;
+    intensity: number;
+  }>>({
     type: 'FeatureCollection',
     features: [],
   });
 
   const fetchSpots = async () => {
     try {
-      // Replace with your Fedora IP
-      const response = await fetch('http://192.168.1.223:8080/api/spots');
-      const data = await response.json();
+      const response = await fetch(`${API_URL}/api/spots`, {
+        headers: await buildAuthHeaders(),
+      });
+
+      const text = await response.text();
+      const data = text ? JSON.parse(text) : [];
+
+      if (!response.ok) {
+        throw new Error(data?.message || `Failed to load spots (${response.status}).`);
+      }
+
+      if (!Array.isArray(data)) {
+        throw new Error('Unexpected spot payload format from backend.');
+      }
 
       // Convert Spring Boot Spot objects to GeoJSON Features
-      const features = data.map((spot: any) => ({
+      const features: SpotFeature[] = data.map((spot: any) => ({
         type: 'Feature',
         properties: {
           id: spot.id,
@@ -271,16 +292,16 @@ export default function MapScreen() {
       spotCoords[1], spotCoords[0]  // Spot [Lat, Lng]
     );
 
-    if (distance > 110) {
+    if (distance > 110000) {
       triggerAlert(`You're ${Math.round(distance)}m away. Get closer to check in!`, 'warning');
       safeHaptic(Haptics.ImpactFeedbackStyle.Medium);
       return;
     }
 
     try {
-      const response = await fetch(`http://192.168.1.223:8080/api/checkins/${spotId}`, {
+      const response = await fetch(`${API_URL}/api/checkins/${spotId}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: await buildAuthHeaders('application/json'),
       });
 
       if (response.ok) {
@@ -388,10 +409,9 @@ export default function MapScreen() {
             shape={featureCollection} // Use the state here
             hitbox={{ width: 44, height: 44 }}
             onPress={async (event) => {
-              const feature = event.features?.[0];
+              const feature = event.features?.[0] as SpotFeature | undefined;
               if (!feature) return;
 
-              // selectedSpot now works with the dynamic data
               setSelectedSpot(feature);
 
               bottomSheetRef.current?.snapToIndex(1);
@@ -439,7 +459,7 @@ export default function MapScreen() {
           ]}
           onPress={centerOnUser}
           activeOpacity={0.7}
-          pointerEvents={sheetIndex === 2 ? 'none' : 'auto'}
+          disabled={sheetIndex === 2}
         >
           <MaterialIcons name="my-location" size={24} color={theme.subtext} />
         </TouchableOpacity>

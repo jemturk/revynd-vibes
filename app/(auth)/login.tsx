@@ -5,7 +5,7 @@ import { useAuth } from '../_layout';
 import { useTheme } from '../../theme/ThemeContext';
 import * as SecureStore from 'expo-secure-store';
 
-export default function LoginScreen () {
+export default function LoginScreen() {
     const { signIn } = useAuth();
     const { theme } = useTheme();
     const styles = makeStyles(theme);
@@ -20,39 +20,42 @@ export default function LoginScreen () {
     const validateForm = () => {
         setErrorMsg('');
 
-        // 1. All fields required validation
-        if (!email || !password || (isSignUp && !name)) {
-            setErrorMsg('All fields are strictly required.');
+        // 1. Basic Presence Validation (with clean string trimming)
+        if (!email.trim() || !password || (isSignUp && !name.trim())) {
+            setErrorMsg('All fields are required.');
             return false;
         }
 
-        // 2. Name length validation (min 3 chars)
+        // 2. Name length constraint (Sign Up Only)
         if (isSignUp && name.trim().length < 3) {
-            setErrorMsg('Name must be at least 3 characters long.');
+            setErrorMsg('Your name should be at least 3 characters long.');
             return false;
         }
 
-        // 3. Email pattern validation (contains @ and .)
-        if (!email.includes('@') || !email.includes('.')) {
-            setErrorMsg('Please enter a valid email address containing "@" and "."');
+        // 3. Structural Email Validation Regex
+        const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailPattern.test(email.trim())) {
+            setErrorMsg('Please enter a valid email address.');
             return false;
         }
 
-        // 4. Password policy validation (min 8 chars, 1 uppercase, 1 special char)
-        const specialCharRegex = /[!@#$%^&*(),.?":{}|<>]/;
-        const uppercaseRegex = /[A-Z]/;
+        // 4. Complexity Constraints (Sign Up Only — Protects Login Lane!)
+        if (isSignUp) {
+            const specialCharRegex = /[!@#$%^&*(),.?":{}|<>]/;
+            const uppercaseRegex = /[A-Z]/;
 
-        if (password.length < 8) {
-            setErrorMsg('Password must be at least 8 characters long.');
-            return false;
-        }
-        if (!uppercaseRegex.test(password)) {
-            setErrorMsg('Password requires at least one uppercase letter.');
-            return false;
-        }
-        if (!specialCharRegex.test(password)) {
-            setErrorMsg('Password requires at least one special character (!@#$%^&*).');
-            return false;
+            if (password.length < 8) {
+                setErrorMsg('Password must be at least 8 characters long.');
+                return false;
+            }
+            if (!uppercaseRegex.test(password)) {
+                setErrorMsg('Password must include at least one uppercase letter.');
+                return false;
+            }
+            if (!specialCharRegex.test(password)) {
+                setErrorMsg('Password must include at least one special character (such as !@#$%^&*).');
+                return false;
+            }
         }
 
         return true;
@@ -67,7 +70,7 @@ export default function LoginScreen () {
         // Hardcoding the live Google Cloud Run Service URL directly
         const BASE_URL = 'https://revynd-api-939729691035.us-east1.run.app';
 
-try {
+        try {
             const response = await fetch(`${BASE_URL}${endpoint}`, {
                 method: 'POST',
                 headers: {
@@ -83,22 +86,64 @@ try {
 
             // 1. Capture the raw payload as a text block first to protect the UI loop
             const rawText = await response.text();
-            
-            // 2. Safely check the syntax profile of the response string
-            let data;
-            try {
-                data = rawText ? JSON.parse(rawText) : {};
-            } catch (jsonParseError) {
-                console.error('❌ JavaScript engine failed to parse raw server context:', jsonParseError);
-                setErrorMsg('Server returned an invalid data payload layout.');
+
+            // 2. Safely parse JSON, but preserve plain string bodies too
+            let data: any = {};
+            if (rawText) {
+                try {
+                    data = JSON.parse(rawText);
+                } catch {
+                    data = { message: rawText.trim() };
+                }
+            }
+            if (!response.ok) {
+                const rawMsg = rawText?.trim() || '';
+                let backendMessage = data?.message || data?.error || data?.detail;
+
+                console.log(response);
+
+                // 1. Direct deep scan across the raw incoming string for the duplicate email flag
+                // This will catch it even if it's buried in an HTML page or stack trace
+                if (/already exists/i.test(rawMsg) || /already exists/i.test(backendMessage || '')) {
+                    setErrorMsg('An account with this email already exists. Please log in instead.');
+                    return;
+                }
+
+                // 2. Process other general exceptions if it isn't a duplicate email error
+                if (!backendMessage && rawMsg) {
+                    if (rawMsg.includes('IllegalArgumentException:')) {
+                        const match = rawMsg.match(/IllegalArgumentException:\s*([^\n\r<]+)/);
+                        if (match && match[1]) {
+                            backendMessage = match[1].trim();
+                        }
+                    } else if (rawMsg.includes('<html') || rawMsg.includes('<body')) {
+                        backendMessage = isSignUp
+                            ? 'Server validation failed during registration.'
+                            : 'Server validation failed during login.';
+                    } else {
+                        backendMessage = rawMsg;
+                    }
+                }
+
+                const normalizedMessage = typeof backendMessage === 'string'
+                    ? backendMessage.replace(/^[^:]+:\s*/, '').trim()
+                    : null;
+
+                const finalMessage = normalizedMessage || (typeof backendMessage === 'string' ? backendMessage : rawMsg);
+
+                // 3. Output evaluation for other errors
+                if (finalMessage && finalMessage.length < 200) {
+                    setErrorMsg(finalMessage);
+                } else {
+                    setErrorMsg(
+                        isSignUp
+                            ? 'Account creation failed. Please check your details and try again.'
+                            : 'Sign In failed. Please check your credentials and try again.'
+                    );
+                }
                 return;
             }
 
-            if (!response.ok) {
-                setErrorMsg(data.message || 'Authentication failed.');
-                return;
-            }
-            
             if (data.token) {
                 await SecureStore.setItemAsync('user_token', data.token);
             }
