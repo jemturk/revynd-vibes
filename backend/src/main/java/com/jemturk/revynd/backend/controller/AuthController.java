@@ -29,6 +29,17 @@ public class AuthController {
         this.authService = authService;
     }
 
+    @RequestMapping(path = "/delete", method = {RequestMethod.DELETE, RequestMethod.POST})
+    public ResponseEntity<?> deleteCurrentUser(@RequestBody Map<String, String> body) {
+        String email = body.get("email");
+        if (email == null || email.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Email is required to delete an account."));
+        }
+
+        authService.deleteUserByEmail(email);
+        return ResponseEntity.ok(Map.of("message", "Account deleted."));
+    }
+
     @PostMapping("/register")
     public ResponseEntity<?> registerUser(@RequestBody RegisterRequest request) {
         // 1. Pass the incoming DTO straight to the service layer to hit Supabase

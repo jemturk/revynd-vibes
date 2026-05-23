@@ -115,4 +115,28 @@ public class AuthService {
         logger.info("🎯 Successful authentication match verified for user ID: {}", user.getId());
         return user;
     }
+
+    @Transactional
+    public void deleteUserByEmail(String email) {
+        String normalized = email.trim().toLowerCase();
+        logger.info("🗑️ Deletion request for user: {}", normalized);
+
+        try {
+            if (!userRepository.existsByEmail(normalized)) {
+                logger.warn("Deletion requested for non-existent email: {}", normalized);
+                throw new IllegalArgumentException("No account found for the provided email address.");
+            }
+
+            userRepository.deleteByEmail(normalized);
+            // Ensure flush to propagate immediately
+            userRepository.flush();
+            entityManager.flush();
+            logger.info("✅ Deletion completed for email: {}", normalized);
+        } catch (IllegalArgumentException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            logger.error("❌ Failed to delete user: ", ex);
+            throw new RuntimeException("Failed to delete account: " + ex.getMessage());
+        }
+    }
 }

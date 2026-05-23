@@ -14,4 +14,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     
     // Quick boolean check to guard against duplicate signups
     boolean existsByEmail(String email);
+    
+    // Remove a user by email
+    void deleteByEmail(String email);
 }
