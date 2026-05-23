@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import withMapboxStrings from './plugins/withMapboxStrings.js';
 
 export default {
   "expo": {
@@ -40,12 +41,11 @@ export default {
     "plugins": [
       "expo-router",
       "expo-secure-store",
+      withMapboxStrings,
       [
         "@rnmapbox/maps",
         {
-          "RNMapboxMapsVersion": "11.18.2",
-          "MAPBOX_DOWNLOADS_TOKEN": process.env.MAPBOX_DOWNLOAD_TOKEN,
-          "RNMapboxMapsAccessToken": process.env.MAPBOX_PUBLIC_TOKEN
+          "RNMapboxMapsDownloadToken": process.env.MAPBOX_DOWNLOAD_TOKEN
         }
       ],
       [

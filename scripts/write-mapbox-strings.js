@@ -15,7 +15,7 @@ function xmlEscape(s) {
 }
 
 if (!publicToken) {
-  console.warn('No MAPBOX_PUBLIC_TOKEN found in environment; writing empty token.');
+  throw new Error('No MAPBOX_PUBLIC_TOKEN found in environment. The Android Mapbox string resource cannot be generated without it.');
 }
 
 const valuesDir = path.join(__dirname, '..', 'android', 'app', 'src', 'main', 'res', 'values');

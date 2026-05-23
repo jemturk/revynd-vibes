@@ -42,4 +42,4 @@ yarn-error.*
 /android
 
 *.apk
-*.aab
+*.aabandroid/app/src/main/res/values/mapbox_strings.xml

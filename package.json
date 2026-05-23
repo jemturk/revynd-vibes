@@ -4,11 +4,11 @@
   "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",
-    "android": "expo run:android",
-    "ios": "expo run:ios",
+    "android": "npm run generate-mapbox-strings && expo run:android",
+    "ios": "npm run generate-mapbox-strings && expo run:ios",
     "web": "expo start --web",
     "generate-mapbox-strings": "node scripts/write-mapbox-strings.js",
-    "prebuild": "npm run generate-mapbox-strings && expo prebuild --clean"
+    "prebuild": "expo prebuild --clean && npm run generate-mapbox-strings"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.1.1",
