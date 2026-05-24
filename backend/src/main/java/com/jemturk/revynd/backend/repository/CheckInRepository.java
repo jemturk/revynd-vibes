@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import com.jemturk.revynd.backend.dto.CheckInRecord;
 import com.jemturk.revynd.backend.model.CheckIn;
 
 import java.util.List;
@@ -34,6 +35,12 @@ public interface CheckInRepository extends JpaRepository<CheckIn, Long> {
     CheckIn findFirstBySpotIdOrderByCheckInTimeDesc(Long spotId);
     
     List<CheckIn> findAllByOrderByCheckInTimeDesc();
+
+  @Query("SELECT new com.jemturk.revynd.dto.CheckInRecord(c.id, c.spotName, c.createdAt) " +
+           "FROM CheckIn c " +
+           "WHERE c.user.id = :userId " +
+           "ORDER BY c.createdAt DESC")
+    List<CheckInRecord> findHistoryByUserId(@Param("userId") Long userId);
 
     /**
      * Find all check-ins after a specific time.

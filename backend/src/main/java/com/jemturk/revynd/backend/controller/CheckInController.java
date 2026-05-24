@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.jemturk.revynd.backend.dto.CheckInRecord;
@@ -64,18 +65,11 @@ public class CheckInController {
         return ResponseEntity.ok("Check-in successful");
     }
 
-    @GetMapping("/history")
-    public List<CheckInRecord> getHistory() {
-        return checkInRepository.findAllByOrderByCheckInTimeDesc()
-                .stream()
-                .map(ci -> new CheckInRecord(
-                        ci.getId(),
-                        ci.getSpot().getName(),
-                        ci.getSpot().getVibe(),
-                        ci.getCheckInTime(),
-                        // Return the intensity that was saved at check-in time, not current
-                        ci.getIntensityAtTime()))
-                .toList();
+@GetMapping("/history")
+    public ResponseEntity<List<CheckInRecord>> getUserCheckInHistory(@RequestParam Long userId) {
+        // 🔒 The DB only returns the records belonging to the calling User ID
+        List<CheckInRecord> history = checkInRepository.findHistoryByUserId(userId);
+        return ResponseEntity.ok(history);
     }
 
     @DeleteMapping("/history/{id}")
