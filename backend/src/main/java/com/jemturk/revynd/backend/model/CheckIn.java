@@ -29,10 +29,12 @@ public class CheckIn {
     @Column(name = "intensity_at_time")
     private Double intensityAtTime;
 
+    @ManyToOne
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
+
     @PrePersist
     protected void onCreate() {
         checkInTime = LocalDateTime.now();
     }
-
-    // We'll add User user; later once we handle Auth
 }

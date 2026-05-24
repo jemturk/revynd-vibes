@@ -34,12 +34,14 @@ public interface CheckInRepository extends JpaRepository<CheckIn, Long> {
 
     CheckIn findFirstBySpotIdOrderByCheckInTimeDesc(Long spotId);
     
+    CheckIn findFirstBySpotIdAndUserIdOrderByCheckInTimeDesc(Long spotId, Long userId);
+    
     List<CheckIn> findAllByOrderByCheckInTimeDesc();
 
-  @Query("SELECT new com.jemturk.revynd.dto.CheckInRecord(c.id, c.spotName, c.createdAt) " +
+  @Query("SELECT new com.jemturk.revynd.backend.dto.CheckInRecord(c.id, c.spot.name, c.spot.vibe, c.checkInTime, c.intensityAtTime) " +
            "FROM CheckIn c " +
            "WHERE c.user.id = :userId " +
-           "ORDER BY c.createdAt DESC")
+           "ORDER BY c.checkInTime DESC")
     List<CheckInRecord> findHistoryByUserId(@Param("userId") Long userId);
 
     /**

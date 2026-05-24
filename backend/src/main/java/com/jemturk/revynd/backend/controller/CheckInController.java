@@ -17,6 +17,9 @@ import org.springframework.web.bind.annotation.RestController;
 import com.jemturk.revynd.backend.dto.CheckInRecord;
 import com.jemturk.revynd.backend.model.CheckIn;
 import com.jemturk.revynd.backend.model.Spot;
+import java.security.Principal;
+import com.jemturk.revynd.backend.model.User;
+import com.jemturk.revynd.backend.repository.UserRepository;
 import com.jemturk.revynd.backend.repository.CheckInRepository;
 import com.jemturk.revynd.backend.repository.SpotRepository;
 
@@ -29,16 +32,21 @@ public class CheckInController {
 
     private final CheckInRepository checkInRepository;
     private final SpotRepository spotRepository;
+    private final UserRepository userRepository;
 
     @PostMapping("/{spotId}")
-    public ResponseEntity<?> createCheckIn(@PathVariable Long spotId) {
+    public ResponseEntity<?> createCheckIn(@PathVariable Long spotId, Principal principal) {
         // 1. Find the spot
         Spot spot = spotRepository.findById(spotId)
                 .orElseThrow(() -> new RuntimeException("Spot not found"));
 
-        // 2. 🛡️ Spam Protection: Check for recent check-ins
-        // (In the future, add: "AND userId = :currentUserId")
-        CheckIn lastCheckIn = checkInRepository.findFirstBySpotIdOrderByCheckInTimeDesc(spotId);
+        // Get currently authenticated user
+        String email = principal.getName();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // 2. 🛡️ Spam Protection: Check for recent check-ins belonging to this user
+        CheckIn lastCheckIn = checkInRepository.findFirstBySpotIdAndUserIdOrderByCheckInTimeDesc(spotId, user.getId());
 
         if (lastCheckIn != null) {
             // LocalDateTime limit = LocalDateTime.now().minusHours(1);
@@ -60,25 +68,40 @@ public class CheckInController {
         CheckIn checkIn = new CheckIn();
         checkIn.setSpot(spot);
         checkIn.setIntensityAtTime(spot.getIntensity());
+        checkIn.setUser(user);
         checkInRepository.save(checkIn);
 
         return ResponseEntity.ok("Check-in successful");
     }
 
-@GetMapping("/history")
-    public ResponseEntity<List<CheckInRecord>> getUserCheckInHistory(@RequestParam Long userId) {
+    @GetMapping("/history")
+    public ResponseEntity<List<CheckInRecord>> getUserCheckInHistory(Principal principal) {
+        // 🔒 Get currently authenticated user from Principal
+        String email = principal.getName();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+                
         // 🔒 The DB only returns the records belonging to the calling User ID
-        List<CheckInRecord> history = checkInRepository.findHistoryByUserId(userId);
+        List<CheckInRecord> history = checkInRepository.findHistoryByUserId(user.getId());
         return ResponseEntity.ok(history);
     }
 
     @DeleteMapping("/history/{id}")
-    public ResponseEntity<Void> deleteHistoryItem(@PathVariable Long id) {
-        try {
-            checkInRepository.deleteById(id);
-            return ResponseEntity.noContent().build(); // Sends 204 Success
-        } catch (EmptyResultDataAccessException e) {
-            return ResponseEntity.notFound().build(); // Sends 404 if ID is wrong
+    public ResponseEntity<Void> deleteHistoryItem(@PathVariable Long id, Principal principal) {
+        String email = principal.getName();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        CheckIn checkIn = checkInRepository.findById(id).orElse(null);
+        if (checkIn == null) {
+            return ResponseEntity.notFound().build();
         }
+
+        if (!checkIn.getUser().getId().equals(user.getId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+
+        checkInRepository.delete(checkIn);
+        return ResponseEntity.noContent().build(); // Sends 204 Success
     }
 }

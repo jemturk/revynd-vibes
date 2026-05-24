@@ -14,7 +14,7 @@ type AccountItemProps = {
   color?: string;
 };
 
-// 1. Re-declare the isolated Account Row item
+// Re-declare the isolated Account Row item
 const AccountItem = ({ icon, label, onPress, rightElement, destructive, color }: AccountItemProps) => {
   const { theme } = useTheme();
   const styles = makeStyles(theme);
@@ -37,7 +37,7 @@ const AccountItem = ({ icon, label, onPress, rightElement, destructive, color }:
 
 const AccountScreen = () => {
   const { theme, isDark, toggleTheme } = useTheme();
-  const { user, signOut } = useAuth(); // 👈 Consuming real session info
+  const { user, signOut } = useAuth(); 
   const styles = makeStyles(theme);
   const [showDeleteModal, setShowDeleteModal] = React.useState(false);
   const [deleteErrorMessage, setDeleteErrorMessage] = React.useState<string | null>(null);
@@ -51,6 +51,20 @@ const AccountScreen = () => {
       ...(contentType ? { 'Content-Type': contentType } : {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     };
+  };
+
+  // 🔒 1. Custom Secure Sign Out Handler
+  const handleSignOut = async () => {
+    try {
+      // Clear out the user tracking parameters to avoid data bleeding between profiles
+      await SecureStore.deleteItemAsync('userId');
+      await SecureStore.deleteItemAsync('user_token');
+    } catch (error) {
+      console.error('Error clearing local cache tokens during sign out:', error);
+    } finally {
+      // Always trigger the navigation context switch 
+      signOut();
+    }
   };
 
   const handleDeleteAccount = () => {
@@ -88,6 +102,8 @@ const AccountScreen = () => {
         return;
       }
 
+      // 🔒 2. Clean out user context strings if account deletion resolves successfully
+      await SecureStore.deleteItemAsync('userId');
       await SecureStore.deleteItemAsync('user_token');
       signOut();
     } catch (error) {
@@ -104,7 +120,6 @@ const AccountScreen = () => {
             {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
           </Text>
         </View>
-        {/* Dynamic Name and Email bound to whoever logged in */}
         <Text style={styles.userName}>{user?.name || "Active Session"}</Text>
         <Text style={styles.userEmail}>{user?.email || "No Email Session Linked"}</Text>
       </View>
@@ -134,7 +149,8 @@ const AccountScreen = () => {
         <Text style={styles.sectionTitle}>Account</Text>
         <AccountItem icon="person-outline" label="Edit Profile" onPress={() => { }} />
         <AccountItem icon="security" label="Privacy Policy" onPress={() => { }} />
-        <AccountItem icon="exit-to-app" label="Sign Out" onPress={signOut} color="#fb923c" />
+        {/* Updated to trigger our custom secure cache clear method 🚀 */}
+        <AccountItem icon="exit-to-app" label="Sign Out" onPress={handleSignOut} color="#fb923c" />
         <AccountItem icon="delete" label="Delete Account" onPress={handleDeleteAccount} destructive />
       </View>
 
@@ -195,7 +211,7 @@ const AccountScreen = () => {
   );
 };
 
-// 2. Restored the missing stylesheet generator factory function
+// Stylesheet generator factory function
 const makeStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
