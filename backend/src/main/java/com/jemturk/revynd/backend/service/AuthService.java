@@ -116,6 +116,12 @@ public class AuthService {
         return user;
     }
 
+    @Transactional(readOnly = true)
+    public User getUserByEmail(String email) {
+        return userRepository.findByEmail(email.trim().toLowerCase())
+                .orElseThrow(() -> new IllegalArgumentException("No account found matching this email address."));
+    }
+
     @Transactional
     public void deleteUserByEmail(String email) {
         String normalized = email.trim().toLowerCase();
@@ -137,6 +143,24 @@ public class AuthService {
         } catch (Exception ex) {
             logger.error("❌ Failed to delete user: ", ex);
             throw new RuntimeException("Failed to delete account: " + ex.getMessage());
+        }
+    }
+
+    @Transactional
+    public User updateProfilePicture(String email, String base64Image) {
+        logger.info("Updating profile picture for email target: {}", email);
+        User user = getUserByEmail(email);
+        user.setProfilePicture(base64Image);
+        
+        try {
+            User savedUser = userRepository.save(user);
+            userRepository.flush();
+            entityManager.flush();
+            logger.info("Profile picture updated successfully for user ID: {}", savedUser.getId());
+            return savedUser;
+        } catch (Exception ex) {
+            logger.error("Failed to persist updated profile picture: ", ex);
+            throw new RuntimeException("Failed to save updated profile picture: " + ex.getMessage());
         }
     }
 }

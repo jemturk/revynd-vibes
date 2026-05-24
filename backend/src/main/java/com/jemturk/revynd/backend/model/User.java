@@ -29,6 +29,9 @@ public class User {
     @Column(nullable = false)
     private String password; // This will hold the secure BCrypt hash, never plain text
 
+    @Column(name = "profile_picture", columnDefinition = "TEXT")
+    private String profilePicture;
+
     // Constructors
     public User() {}
 
@@ -46,4 +49,6 @@ public class User {
     public void setEmail(String email) { this.email = email; }
     public String getPassword() { return password; }
     public void setPassword(String password) { this.password = password; }
+    public String getProfilePicture() { return profilePicture; }
+    public void setProfilePicture(String profilePicture) { this.profilePicture = profilePicture; }
 }

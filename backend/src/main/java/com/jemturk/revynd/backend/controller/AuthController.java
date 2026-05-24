@@ -11,6 +11,7 @@ import com.jemturk.revynd.backend.dto.RegisterRequest;
 import com.jemturk.revynd.backend.model.User;
 import com.jemturk.revynd.backend.service.AuthService;
 
+import java.security.Principal;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -55,6 +56,7 @@ public class AuthController {
         response.put("name", savedUser.getName());
         response.put("email", savedUser.getEmail());
         response.put("token", token);
+        response.put("profilePicture", savedUser.getProfilePicture());
 
         return ResponseEntity.ok(response);
     }
@@ -81,8 +83,29 @@ public class AuthController {
         response.put("name", authenticatedUser.getName());
         response.put("email", authenticatedUser.getEmail());
         response.put("token", token);
+        response.put("profilePicture", authenticatedUser.getProfilePicture());
 
         return ResponseEntity.ok(response);
+    }
+
+    @PutMapping("/profile-picture")
+    public ResponseEntity<?> updateProfilePicture(@RequestBody Map<String, String> request, Principal principal) {
+        if (principal == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "User is not authenticated."));
+        }
+        
+        String email = principal.getName();
+        String base64Image = request.get("profilePicture");
+        
+        if (base64Image == null) {
+            return ResponseEntity.badRequest().body(Map.of("message", "profilePicture payload is required."));
+        }
+        
+        User updatedUser = authService.updateProfilePicture(email, base64Image);
+        return ResponseEntity.ok(Map.of(
+            "message", "Profile picture updated successfully",
+            "profilePicture", updatedUser.getProfilePicture() != null ? updatedUser.getProfilePicture() : ""
+        ));
     }
 
     private String generateJwtToken(String email) {
