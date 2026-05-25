@@ -16,4 +16,8 @@ public interface SpotRepository extends JpaRepository<Spot, Long> {
             WHERE ST_DWithin(location, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography, :distance)
             """, nativeQuery = true)
     List<Spot> findNearby(@Param("lat") double lat, @Param("lng") double lng, @Param("distance") double distance);
+
+    default List<Spot> findNearbySpots(double lat, double lng) {
+        return findNearby(lat, lng, 5000.0); // 5km search radius for local spots
+    }
 }

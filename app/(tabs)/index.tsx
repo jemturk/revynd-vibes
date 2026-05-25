@@ -229,9 +229,10 @@ export default function MapScreen() {
     features: [],
   });
 
-  const fetchSpots = async () => {
+  const fetchSpots = async (coords?: [number, number]) => {
     try {
-      const response = await fetch(`${API_URL}/api/spots`, {
+      const activeCoords = coords || userCoords || NYC_COORDS;
+      const response = await fetch(`${API_URL}/api/spots/explore?lat=${activeCoords[1]}&lng=${activeCoords[0]}&categories=bar,coffee_shop_cafe,skate_park,skatepark`, {
         headers: await buildAuthHeaders(),
       });
 
@@ -279,7 +280,7 @@ export default function MapScreen() {
 
   const handleRefresh = () => {
     setIsRefreshing(true);
-    fetchSpots();
+    fetchSpots(userCoords || undefined);
   };
 
   const buttonBottom = sheetIndex === 0 ? 150 : sheetIndex === 1 ? 300 : -150;
@@ -319,9 +320,15 @@ export default function MapScreen() {
     }
 
     try {
-      const response = await fetch(`${API_URL}/api/checkins/${spotId}`, {
+      const response = await fetch(`${API_URL}/api/checkins/checkins`, {
         method: 'POST',
         headers: await buildAuthHeaders('application/json'),
+        body: JSON.stringify({
+          id: spotId,
+          name: selectedSpot.properties.name,
+          vibe: selectedSpot.properties.vibe,
+          location: [spotCoords[0], spotCoords[1]],
+        }),
       });
 
       if (response.ok) {
@@ -350,6 +357,7 @@ export default function MapScreen() {
         location.coords.latitude,
       ];
       setUserCoords(coords);
+      fetchSpots(coords);
 
       try {
         const reverseCoords = { latitude: coords[1], longitude: coords[0] };

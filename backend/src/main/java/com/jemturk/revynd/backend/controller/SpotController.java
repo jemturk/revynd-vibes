@@ -3,10 +3,13 @@ package com.jemturk.revynd.backend.controller;
 import org.springframework.web.bind.annotation.*;
 
 import com.jemturk.revynd.backend.dto.SpotRecord;
+import com.jemturk.revynd.backend.dto.SpotResponseDTO;
 import com.jemturk.revynd.backend.model.Spot;
 import com.jemturk.revynd.backend.repository.CheckInRepository;
 import com.jemturk.revynd.backend.repository.SpotRepository;
+import com.jemturk.revynd.backend.service.SpotDiscoveryService;
 
+import org.springframework.http.ResponseEntity;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -19,10 +22,22 @@ public class SpotController {
 
     private final SpotRepository spotRepository;
     private final CheckInRepository checkInRepository;
+    private final SpotDiscoveryService spotDiscoveryService;
 
-    public SpotController(SpotRepository spotRepository, CheckInRepository checkInRepository) {
+    public SpotController(SpotRepository spotRepository, CheckInRepository checkInRepository, SpotDiscoveryService spotDiscoveryService) {
         this.spotRepository = spotRepository;
         this.checkInRepository = checkInRepository;
+        this.spotDiscoveryService = spotDiscoveryService;
+    }
+
+    @GetMapping("/explore")
+    public ResponseEntity<List<SpotResponseDTO>> exploreCurrentArea(
+            @RequestParam double lat,
+            @RequestParam double lng,
+            @RequestParam(required = false, defaultValue = "bar,coffee_shop_cafe,skate_park,skatepark") String categories) {
+        
+        List<SpotResponseDTO> nearbySpots = spotDiscoveryService.getUnifiedSpots(lat, lng, categories);
+        return ResponseEntity.ok(nearbySpots);
     }
 
     @GetMapping("/nearby")

@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.jemturk.revynd.backend.dto.CheckInRecord;
+import com.jemturk.revynd.backend.dto.CheckInRequestDTO;
 import com.jemturk.revynd.backend.model.CheckIn;
 import com.jemturk.revynd.backend.model.Spot;
 import java.security.Principal;
@@ -22,6 +23,11 @@ import com.jemturk.revynd.backend.model.User;
 import com.jemturk.revynd.backend.repository.UserRepository;
 import com.jemturk.revynd.backend.repository.CheckInRepository;
 import com.jemturk.revynd.backend.repository.SpotRepository;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.GeometryFactory;
+import org.locationtech.jts.geom.Point;
+import org.locationtech.jts.geom.PrecisionModel;
 
 import lombok.RequiredArgsConstructor;
 
@@ -29,6 +35,8 @@ import lombok.RequiredArgsConstructor;
 @RequestMapping("/api/checkins")
 @RequiredArgsConstructor
 public class CheckInController {
+
+    private static final GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
 
     private final CheckInRepository checkInRepository;
     private final SpotRepository spotRepository;
@@ -103,5 +111,58 @@ public class CheckInController {
 
         checkInRepository.delete(checkIn);
         return ResponseEntity.noContent().build(); // Sends 204 Success
+    }
+
+    @PostMapping("/checkins")
+    public ResponseEntity<?> checkIn(@RequestBody CheckInRequestDTO request, Principal principal) {
+        // Get currently authenticated user
+        String email = principal.getName();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        Spot spot;
+        if (request.getId().startsWith("transient-")) {
+            // Convert double[] [lng, lat] from frontend DTO to a JTS Point
+            double[] coords = request.getLocation();
+            Point spatialPoint = geometryFactory.createPoint(new Coordinate(coords[0], coords[1]));
+
+            // Initialize and persist the location data
+            spot = new Spot();
+            spot.setName(request.getName());
+            spot.setVibe(request.getVibe());
+            spot.setLocation(spatialPoint); // Seamlessly binds to Point property
+            spot.setIntensity(0.0); // Will be updated to 0.1 after check-in
+
+            spot = spotRepository.save(spot);
+        } else {
+            spot = spotRepository.findById(Long.parseLong(request.getId()))
+                    .orElseThrow(() -> new RuntimeException("Spot not found"));
+        }
+
+        // 🛡️ Spam Protection: Check for recent check-ins belonging to this user
+        CheckIn lastCheckIn = checkInRepository.findFirstBySpotIdAndUserIdOrderByCheckInTimeDesc(spot.getId(), user.getId());
+
+        if (lastCheckIn != null) {
+            LocalDateTime limit = LocalDateTime.now().minusSeconds(1); // Same threshold as existing config
+            if (lastCheckIn.getCheckInTime().isAfter(limit)) {
+                return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                        .body("Slow down! You can only boost the vibe once per hour.");
+            }
+        }
+
+        double currentIntensity = spot.getIntensity() != null ? spot.getIntensity() : 0.0;
+        double updatedIntensity = Math.min(1.0, currentIntensity + 0.1);
+        
+        spot.setIntensity(updatedIntensity);
+        spotRepository.save(spot); // Update the source
+
+        // Save the new check-in
+        CheckIn checkIn = new CheckIn();
+        checkIn.setSpot(spot);
+        checkIn.setIntensityAtTime(spot.getIntensity());
+        checkIn.setUser(user);
+        checkInRepository.save(checkIn);
+
+        return ResponseEntity.ok("Check-in successful");
     }
 }
