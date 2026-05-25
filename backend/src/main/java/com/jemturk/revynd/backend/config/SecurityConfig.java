@@ -18,6 +18,7 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable()) // Keep disabled for stateless APIs
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**").permitAll() // Login/Register stay public
+                        .requestMatchers("/api/spots/**").permitAll() // 🗺️ Allow public spot exploration!
                         .requestMatchers("/api/checkins/**").authenticated() // 🔒 Locked back down!
                         .anyRequest().authenticated())
                 // Inject our custom token validator into the standard security filter pipeline
