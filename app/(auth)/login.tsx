@@ -151,6 +151,7 @@ export default function LoginScreen() {
             signIn({
                 name: data.name || 'Rider',
                 email: data.email,
+                profilePicture: data.profilePicture || undefined,
             });
 
         } catch (error) {

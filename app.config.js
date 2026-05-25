@@ -23,7 +23,7 @@ export default {
     "android": {
       "package": "com.jemturk.revynd", // 👈 Consolidated your unique branding package name here
       "kotlinVersion": "1.9.24",       // 👈 Brought your custom kotlin engine target inside the bundle
-      "edgeToEdgeEnabled": true,
+      "edgeToEdgeEnabled": false,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -34,6 +34,11 @@ export default {
         "ACCESS_FINE_LOCATION",   // 👈 Allows high-fidelity GPS pin tracking
         "FOREGROUND_SERVICE"      // 👈 Required if tracking pins while screen is active
       ]
+    },
+    "androidStatusBar": {
+      "barStyle": "light-content",
+      "backgroundColor": "#000000",
+      "translucent": false
     },
     "web": {
       "favicon": "./assets/favicon.png"

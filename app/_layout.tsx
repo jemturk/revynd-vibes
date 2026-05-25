@@ -5,10 +5,10 @@ import { ThemeProvider } from '../theme/ThemeContext';
 import { useEffect, useState, createContext, useContext } from 'react';
 import Constants from 'expo-constants';
 import Mapbox from '@rnmapbox/maps';
-// Define a structured User type
 export type UserSession = {
   name: string;
   email: string;
+  profilePicture?: string;
 } | null;
 
 const AuthContext = createContext<{ 

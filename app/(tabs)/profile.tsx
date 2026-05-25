@@ -1,9 +1,10 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Modal, Pressable, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Modal, Pressable, Alert, Image, ActivityIndicator } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme, AppTheme } from '../../theme/ThemeContext';
 import { useAuth } from '../_layout'; 
 import * as SecureStore from 'expo-secure-store';
+import * as ImagePicker from 'expo-image-picker';
 
 type AccountItemProps = {
   icon: React.ComponentProps<typeof MaterialIcons>['name'];
@@ -37,12 +38,122 @@ const AccountItem = ({ icon, label, onPress, rightElement, destructive, color }:
 
 const AccountScreen = () => {
   const { theme, isDark, toggleTheme } = useTheme();
-  const { user, signOut } = useAuth(); 
+  const { user, signIn, signOut } = useAuth(); 
   const styles = makeStyles(theme);
   const [showDeleteModal, setShowDeleteModal] = React.useState(false);
+  const [showPhotoModal, setShowPhotoModal] = React.useState(false);
   const [deleteErrorMessage, setDeleteErrorMessage] = React.useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = React.useState<string | null>(null);
+  const [uploading, setUploading] = React.useState(false);
 
   const API_URL = 'https://revynd-api-939729691035.us-east1.run.app';
+
+  const pickImage = () => {
+    setShowPhotoModal(true);
+  };
+
+  const handleImageAction = async (action: 'camera' | 'library') => {
+    try {
+      let result;
+      const options = {
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1] as [number, number],
+        quality: 0.4,
+        base64: true,
+      };
+
+      if (action === 'camera') {
+        const cameraPermission = await ImagePicker.requestCameraPermissionsAsync();
+        if (!cameraPermission.granted) {
+          Alert.alert('Permission Denied', 'Camera access is required to take a profile picture.');
+          return;
+        }
+        result = await ImagePicker.launchCameraAsync(options);
+      } else {
+        const libraryPermission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!libraryPermission.granted) {
+          Alert.alert('Permission Denied', 'Media library access is required to choose a profile picture.');
+          return;
+        }
+        result = await ImagePicker.launchImageLibraryAsync(options);
+      }
+
+      if (result.canceled || !result.assets || result.assets.length === 0) {
+        return;
+      }
+
+      setUploading(true);
+      const asset = result.assets[0];
+      const base64Str = `data:image/jpeg;base64,${asset.base64}`;
+
+      const response = await fetch(`${API_URL}/api/auth/profile-picture`, {
+        method: 'PUT',
+        headers: await buildAuthHeaders('application/json'),
+        body: JSON.stringify({ profilePicture: base64Str }),
+      });
+
+      const raw = await response.text();
+      let payload: any = {};
+      try { payload = raw ? JSON.parse(raw) : {}; } catch { payload = { message: raw?.trim() } }
+
+      if (!response.ok) {
+        const msg = payload?.message || `Upload failed (${response.status}).`;
+        Alert.alert('Upload Failed', msg);
+        return;
+      }
+
+      if (user) {
+        signIn({
+          ...user,
+          profilePicture: base64Str,
+        });
+      }
+      
+      setSuccessMessage('Profile picture updated successfully!');
+    } catch (error) {
+      console.error('Image picking/upload error:', error);
+      Alert.alert('Error', 'An unexpected error occurred while picking or uploading your image.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDeletePhoto = async () => {
+    try {
+      setUploading(true);
+
+      const response = await fetch(`${API_URL}/api/auth/profile-picture`, {
+        method: 'PUT',
+        headers: await buildAuthHeaders('application/json'),
+        body: JSON.stringify({ profilePicture: "" }), // Clear/delete image by sending empty string
+      });
+
+      const raw = await response.text();
+      let payload: any = {};
+      try { payload = raw ? JSON.parse(raw) : {}; } catch { payload = { message: raw?.trim() } }
+
+      if (!response.ok) {
+        const msg = payload?.message || `Failed to remove photo (${response.status}).`;
+        Alert.alert('Error', msg);
+        return;
+      }
+
+      if (user) {
+        signIn({
+          ...user,
+          profilePicture: "",
+        });
+      }
+      
+      setSuccessMessage('Profile picture removed successfully!');
+    } catch (error) {
+      console.error('Delete photo error:', error);
+      Alert.alert('Error', 'An unexpected error occurred while deleting your profile picture.');
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const buildAuthHeaders = async (contentType?: string) => {
     const token = await SecureStore.getItemAsync('user_token');
@@ -115,11 +226,27 @@ const AccountScreen = () => {
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>
-            {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
-          </Text>
-        </View>
+        <TouchableOpacity 
+          style={styles.avatarWrapper} 
+          onPress={pickImage} 
+          disabled={uploading}
+          activeOpacity={0.8}
+        >
+          <View style={styles.avatar}>
+            {uploading ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : user?.profilePicture ? (
+              <Image source={{ uri: user.profilePicture }} style={styles.avatarImage} />
+            ) : (
+              <Text style={styles.avatarText}>
+                {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
+              </Text>
+            )}
+          </View>
+          <View style={styles.editBadge}>
+            <MaterialIcons name="photo-camera" size={14} color="#fff" />
+          </View>
+        </TouchableOpacity>
         <Text style={styles.userName}>{user?.name || "Active Session"}</Text>
         <Text style={styles.userEmail}>{user?.email || "No Email Session Linked"}</Text>
       </View>
@@ -153,6 +280,78 @@ const AccountScreen = () => {
         <AccountItem icon="exit-to-app" label="Sign Out" onPress={handleSignOut} color="#fb923c" />
         <AccountItem icon="delete" label="Delete Account" onPress={handleDeleteAccount} destructive />
       </View>
+
+      <Modal
+        visible={showPhotoModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowPhotoModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>Profile Picture</Text>
+            <Text style={styles.modalMessage}>
+              Update or remove your profile picture.
+            </Text>
+
+            <TouchableOpacity
+              style={styles.photoOptionButton}
+              onPress={() => {
+                setShowPhotoModal(false);
+                handleImageAction('camera');
+              }}
+            >
+              <MaterialIcons name="photo-camera" size={20} color={theme.text} style={styles.photoOptionIcon} />
+              <Text style={styles.photoOptionText}>Take Photo</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.photoOptionButton}
+              onPress={() => {
+                setShowPhotoModal(false);
+                handleImageAction('library');
+              }}
+            >
+              <MaterialIcons name="photo-library" size={20} color={theme.text} style={styles.photoOptionIcon} />
+              <Text style={styles.photoOptionText}>Choose from Library</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.photoOptionButton,
+                !(user?.profilePicture && user.profilePicture !== "") && styles.photoOptionDisabledButton
+              ]}
+              disabled={!(user?.profilePicture && user.profilePicture !== "")}
+              onPress={() => {
+                setShowPhotoModal(false);
+                handleDeletePhoto();
+              }}
+            >
+              <MaterialIcons 
+                name="delete-outline" 
+                size={20} 
+                color={(user?.profilePicture && user.profilePicture !== "") ? '#ef4444' : theme.subtext} 
+                style={styles.photoOptionIcon} 
+              />
+              <Text style={[
+                styles.photoOptionText,
+                (user?.profilePicture && user.profilePicture !== "") ? styles.photoOptionDeleteText : styles.photoOptionDisabledText
+              ]}>
+                Delete Photo
+              </Text>
+            </TouchableOpacity>
+
+            <View style={{ marginTop: 10 }}>
+              <Pressable
+                style={[styles.modalButton, { backgroundColor: '#FB923C', marginRight: 0 }]}
+                onPress={() => setShowPhotoModal(false)}
+              >
+                <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>Cancel</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <Modal
         visible={showDeleteModal}
@@ -206,6 +405,31 @@ const AccountScreen = () => {
         </View>
       </Modal>
 
+      <Modal
+        visible={Boolean(successMessage)}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSuccessMessage(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={{ alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+              <MaterialIcons name="check-circle" size={50} color="#FB923C" />
+            </View>
+            <Text style={[styles.modalTitle, { textAlign: 'center' }]}>Success</Text>
+            <Text style={[styles.modalMessage, { textAlign: 'center', marginBottom: 20 }]}>{successMessage}</Text>
+            <View style={styles.modalButtons}>
+              <Pressable
+                style={[styles.modalButton, { backgroundColor: '#FB923C', marginRight: 0 }]}
+                onPress={() => setSuccessMessage(null)}
+              >
+                <Text style={styles.modalDeleteText}>OK</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       <Text style={styles.versionText}>Version 1.0.4</Text>
     </ScrollView>
   );
@@ -224,6 +448,10 @@ const makeStyles = (theme: AppTheme) => StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: theme.border,
   },
+  avatarWrapper: {
+    marginBottom: 16,
+    position: 'relative',
+  },
   avatar: {
     width: 80,
     height: 80,
@@ -231,7 +459,30 @@ const makeStyles = (theme: AppTheme) => StyleSheet.create({
     backgroundColor: theme.primary || '#FB923C',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+  },
+  editBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    backgroundColor: '#FB923C',
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: theme.card,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 1 },
   },
   avatarText: { color: 'white', fontSize: 32, fontWeight: '800' },
   userName: { fontSize: 20, fontWeight: '700', color: theme.text },
@@ -318,6 +569,35 @@ const makeStyles = (theme: AppTheme) => StyleSheet.create({
     color: '#fff',
     fontSize: 15,
     fontWeight: '700',
+  },
+  photoOptionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: theme.background,
+    borderWidth: 1,
+    borderColor: theme.border,
+    marginBottom: 10,
+    width: '100%',
+  },
+  photoOptionDisabledButton: {
+    opacity: 0.4,
+  },
+  photoOptionIcon: {
+    marginRight: 12,
+  },
+  photoOptionText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: theme.text,
+  },
+  photoOptionDisabledText: {
+    color: theme.subtext,
+  },
+  photoOptionDeleteText: {
+    color: '#ef4444',
   },
   versionText: {
     textAlign: 'center',
