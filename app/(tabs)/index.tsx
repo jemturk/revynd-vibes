@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react';
-import { StyleSheet, View, Text, Alert, TouchableOpacity, ActivityIndicator, Animated, StatusBar } from 'react-native';
+import { StyleSheet, View, Text, Alert, TouchableOpacity, ActivityIndicator, Animated, Easing, StatusBar } from 'react-native';
 import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Mapbox from '@rnmapbox/maps';
@@ -26,6 +26,49 @@ type SpotFeature = Feature<Point, {
 export default function MapScreen() {
   const { theme, isDark } = useTheme();
 
+  const cameraRef = useRef<Mapbox.Camera>(null);
+  const bottomSheetRef = useRef<BottomSheet>(null);
+  const snapPoints = useMemo(() => ['14%', '40%', '90%'], []);
+
+  const [selectedSpot, setSelectedSpot] = useState<SpotFeature | null>(null);
+  const [userCoords, setUserCoords] = useState<[number, number] | null>(null);
+  const [sheetIndex, setSheetIndex] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [currentCity, setCurrentCity] = useState<string | null>(null);
+
+  const [alertConfig, setAlertConfig] = useState<{ msg: string; type: 'error' | 'warning' | 'success' | null }>({ msg: '', type: null });
+  const slideAnim = useRef(new Animated.Value(-100)).current; // Start off-screen
+
+  // Animated value driving the expanding pulse ripple layer
+  const pulseAnim = useRef(new Animated.Value(0)).current;
+
+  // Infinite loop configuration for breathing glow pulses
+  useEffect(() => {
+    const startPulse = () => {
+      pulseAnim.setValue(0);
+      Animated.timing(pulseAnim, {
+        toValue: 1,
+        duration: 2500, // Speed of the ambient pulse wave
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: false, // Mapbox layout evaluations require standard JS interpolation bridges
+      }).start(() => startPulse());
+    };
+
+    startPulse();
+  }, [pulseAnim]);
+
+  // Interpolated streams bridging React Native values straight into Mapbox styles
+  const pulseRadius = pulseAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [12, 55],
+  });
+
+  const pulseOpacity = pulseAnim.interpolate({
+    inputRange: [0, 0.7, 1],
+    outputRange: [0.6, 0.4, 0],
+  });
+
   const centerOnUser = () => {
     if (userCoords && cameraRef.current) {
       cameraRef.current.flyTo(userCoords, 1000); // 1-second smooth glide
@@ -44,20 +87,6 @@ export default function MapScreen() {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     };
   };
-
-  const cameraRef = useRef<Mapbox.Camera>(null);
-  const bottomSheetRef = useRef<BottomSheet>(null);
-  const snapPoints = useMemo(() => ['14%', '40%', '90%'], []);
-
-  const [selectedSpot, setSelectedSpot] = useState<SpotFeature | null>(null);
-  const [userCoords, setUserCoords] = useState<[number, number] | null>(null);
-  const [sheetIndex, setSheetIndex] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [currentCity, setCurrentCity] = useState<string | null>(null);
-
-  const [alertConfig, setAlertConfig] = useState<{ msg: string; type: 'error' | 'warning' | 'success' | null }>({ msg: '', type: null });
-  const slideAnim = useRef(new Animated.Value(-100)).current; // Start off-screen
 
   const styles = useMemo(() => StyleSheet.create({
     container: { flex: 1, backgroundColor: theme.background },
@@ -78,7 +107,6 @@ export default function MapScreen() {
       backgroundColor: theme.card,
       borderRadius: 15
     },
-    vibeText: { fontSize: 16, fontWeight: '600' },
     floatingButton: {
       position: 'absolute',
       right: 20,
@@ -139,14 +167,14 @@ export default function MapScreen() {
     },
     barFill: {
       height: '100%',
-      backgroundColor: '#FB923C', // Keeping orange for now
+      backgroundColor: '#FB923C',
       borderRadius: 5,
       borderRightWidth: 3,
       borderRightColor: '#FB923C',
     },
     checkInButton: {
       width: '100%',
-      backgroundColor: '#0D9488', // Keeping teal for now
+      backgroundColor: '#0D9488',
       paddingVertical: 14,
       borderRadius: 12,
       alignItems: 'center',
@@ -164,12 +192,10 @@ export default function MapScreen() {
 
   const safeHaptic = async (style: Haptics.ImpactFeedbackStyle) => {
     try {
-      // Check if the method exists before calling it
       if (Haptics && typeof Haptics.impactAsync === 'function') {
         await Haptics.impactAsync(style);
       }
     } catch (error) {
-      // If it fails, the app keeps running and the user just doesn't feel the buzz
       console.log("Haptics unavailable");
     }
   };
@@ -177,15 +203,13 @@ export default function MapScreen() {
   const triggerAlert = (msg: string, type: 'error' | 'warning' | 'success') => {
     setAlertConfig({ msg, type });
 
-    // Slide down
     Animated.spring(slideAnim, {
-      toValue: 50, // Final position from top
+      toValue: 50,
       useNativeDriver: true,
       tension: 50,
       friction: 8,
     }).start();
 
-    // Slide back up after 3 seconds
     setTimeout(() => {
       Animated.timing(slideAnim, {
         toValue: -100,
@@ -222,7 +246,6 @@ export default function MapScreen() {
         throw new Error('Unexpected spot payload format from backend.');
       }
 
-      // Convert Spring Boot Spot objects to GeoJSON Features
       const features: SpotFeature[] = data.map((spot: any) => ({
         type: 'Feature',
         properties: {
@@ -261,7 +284,6 @@ export default function MapScreen() {
 
   const buttonBottom = sheetIndex === 0 ? 150 : sheetIndex === 1 ? 300 : -150;
 
-  // 📏 Distance (meters)
   const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
     const R = 6371e3;
     const φ1 = lat1 * Math.PI / 180;
@@ -282,14 +304,12 @@ export default function MapScreen() {
       return;
     }
 
-    if (!selectedSpot) return;
-
     const spotId = selectedSpot.properties.id;
     const spotCoords = selectedSpot.geometry.coordinates;
 
     const distance = getDistance(
-      userCoords[1], userCoords[0], // User [Lat, Lng]
-      spotCoords[1], spotCoords[0]  // Spot [Lat, Lng]
+      userCoords[1], userCoords[0],
+      spotCoords[1], spotCoords[0]
     );
 
     if (distance > 110000) {
@@ -305,7 +325,7 @@ export default function MapScreen() {
       });
 
       if (response.ok) {
-        triggerAlert(`You're checked in at ${selectedSpot?.properties.name}!`, 'success')
+        triggerAlert(`You're checked in at ${selectedSpot?.properties.name}!`, 'success');
         safeHaptic(Haptics.ImpactFeedbackStyle.Light);
         handleRefresh();
       } else if (response.status === 429) {
@@ -331,12 +351,10 @@ export default function MapScreen() {
       ];
       setUserCoords(coords);
 
-      // --- REVERSE GEOCODING LOGIC ---
       try {
         const reverseCoords = { latitude: coords[1], longitude: coords[0] };
         const address = await Location.reverseGeocodeAsync(reverseCoords);
         if (address.length > 0) {
-          // Most addresses return a "city" or "district"
           setCurrentCity(address[0].city || address[0].subregion);
         }
       } catch (e) {
@@ -367,8 +385,6 @@ export default function MapScreen() {
     loadLastSpot();
   }, []);
 
-
-
   if (isLoading) {
     return (
       <View style={styles.center}>
@@ -379,18 +395,16 @@ export default function MapScreen() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <>
-        <StatusBar
-          barStyle={isDark ? "light-content" : "dark-content"}
-          backgroundColor="transparent"
-          translucent={true}
-        />
-      </>
+      <StatusBar
+        barStyle={isDark ? "light-content" : "dark-content"}
+        backgroundColor="transparent"
+        translucent={true}
+      />
       <View style={styles.container}>
         <Mapbox.MapView
           scaleBarEnabled={false}
           logoEnabled={true}
-          logoPosition={{ top: 10, left: 10 }} // Nudge it up so the BottomSheet doesn't hide it
+          logoPosition={{ top: 10, left: 10 }}
           attributionEnabled={true}
           attributionPosition={{ top: 10, left: 100 }}
           compassEnabled={true}
@@ -406,41 +420,53 @@ export default function MapScreen() {
 
           <Mapbox.ShapeSource
             id="spots"
-            shape={featureCollection} // Use the state here
+            shape={featureCollection}
             hitbox={{ width: 44, height: 44 }}
             onPress={async (event) => {
               const feature = event.features?.[0] as SpotFeature | undefined;
               if (!feature) return;
 
               setSelectedSpot(feature);
-
               bottomSheetRef.current?.snapToIndex(1);
               cameraRef.current?.flyTo(feature.geometry.coordinates, 800);
             }}
           >
-
-            <Mapbox.CircleLayer
-              id="spots-anchor"
+            {/* LAYER 1: Dynamic Pulsing Wave (The Background Ripple) */}
+            <Mapbox.Animated.CircleLayer
+              id="spots-pulse-wave"
               style={{
-                circleRadius: 5,
-                circleColor: '#FB923C', // Neutral grey
-                circleStrokeWidth: 1,
-                circleStrokeColor: 'black',
-                circleOpacity: 0.8,
+                circleRadius: pulseRadius,
+                circleColor: '#FB923C',
+                // FIX: Multiply the global animation value by the feature's unique intensity metric
+                circleOpacity: ['*', pulseOpacity, ['get', 'intensity']],
+                circleBlur: 0.4,
+                circleOpacityTransition: { duration: 0 },
+                circleRadiusTransition: { duration: 0 }
               }}
             />
 
+            {/* LAYER 2: Core Base Glow (Static ambient blur scaled by backend intensity) */}
             <Mapbox.CircleLayer
-              id="spots-layer"
-              existing={false}
+              id="spots-ambient-glow"
               style={{
-                circleRadius: 25,
+                circleRadius: 28,
                 circleColor: '#FB923C',
-                circleOpacity: ['get', 'intensity'],
+                circleOpacity: ['*', ['get', 'intensity'], 0.7],
                 circleBlur: 0.8,
               }}
             />
 
+            {/* LAYER 3: The Crisp Anchor Pin (Central structural target dot) */}
+            <Mapbox.CircleLayer
+              id="spots-anchor"
+              style={{
+                circleRadius: 6,
+                circleColor: theme.card,
+                circleStrokeWidth: 2.5,
+                circleStrokeColor: '#FB923C',
+                circleOpacity: 1,
+              }}
+            />
           </Mapbox.ShapeSource>
 
           <Mapbox.Camera
@@ -468,10 +494,9 @@ export default function MapScreen() {
           style={[
             styles.floatingButton,
             {
-              // Position it exactly 60px (button height + gap) above the find-me button
               bottom: buttonBottom + 64,
               opacity: sheetIndex === 2 ? 0 : 1,
-              backgroundColor: theme.primary // Distinct color for refresh
+              backgroundColor: theme.primary
             }
           ]}
           onPress={handleRefresh}
@@ -495,12 +520,9 @@ export default function MapScreen() {
         >
           <BottomSheetView style={styles.contentContainer}>
             {selectedSpot ? (() => {
-              // 💡 LIVE DATA LOOKUP: Find the current version of this spot in your main state
               const liveSpot = featureCollection?.features.find(
                 (f) => f.properties.id === selectedSpot.properties.id
               );
-
-              // Fallback to selectedSpot if liveSpot isn't found during a transition
               const displaySpot = liveSpot || selectedSpot;
 
               return (
@@ -518,7 +540,6 @@ export default function MapScreen() {
                         <Text style={styles.densityLabel}>Vibe Crowd</Text>
                       </View>
 
-                      {/* The Progress Bar */}
                       <View style={styles.barTrack}>
                         <View
                           style={[
@@ -558,13 +579,14 @@ export default function MapScreen() {
             )}
           </BottomSheetView>
         </BottomSheet>
+
         <Animated.View style={[
           styles.customAlert,
           {
             transform: [{ translateY: slideAnim }],
             backgroundColor:
-              alertConfig.type === 'success' ? '#10B981' : // Emerald Green
-                alertConfig.type === 'error' ? '#EF4444' :   // Red
+              alertConfig.type === 'success' ? '#10B981' :
+                alertConfig.type === 'error' ? '#EF4444' :
                   '#F59E0B'
           }
         ]}>
