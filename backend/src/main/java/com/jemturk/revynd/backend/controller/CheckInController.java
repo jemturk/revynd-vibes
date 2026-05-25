@@ -68,7 +68,7 @@ public class CheckInController {
         double currentIntensity = spot.getIntensity() != null ? spot.getIntensity() : 0.0;
         // Add 10% for every new check-in, capping at 1.0 (100%)
         double updatedIntensity = Math.min(1.0, currentIntensity + 0.1);
-        
+
         spot.setIntensity(updatedIntensity);
         spotRepository.save(spot); // Update the source
 
@@ -88,7 +88,7 @@ public class CheckInController {
         String email = principal.getName();
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
-                
+
         // 🔒 The DB only returns the records belonging to the calling User ID
         List<CheckInRecord> history = checkInRepository.findHistoryByUserId(user.getId());
         return ResponseEntity.ok(history);
@@ -122,25 +122,36 @@ public class CheckInController {
 
         Spot spot;
         if (request.getId().startsWith("transient-")) {
-            // Convert double[] [lng, lat] from frontend DTO to a JTS Point
             double[] coords = request.getLocation();
-            Point spatialPoint = geometryFactory.createPoint(new Coordinate(coords[0], coords[1]));
+            
+            // Prevent duplicate creation due to concurrency or rapid taps: check if spot exists within 100m
+            List<Spot> nearbyMatches = spotRepository.findNearby(coords[1], coords[0], 100.0);
+            Spot existingSpot = nearbyMatches.stream()
+                    .filter(s -> s.getName().equalsIgnoreCase(request.getName()))
+                    .findFirst()
+                    .orElse(null);
+            
+            if (existingSpot != null) {
+                spot = existingSpot;
+            } else {
+                Point spatialPoint = geometryFactory.createPoint(new Coordinate(coords[0], coords[1]));
 
-            // Initialize and persist the location data
-            spot = new Spot();
-            spot.setName(request.getName());
-            spot.setVibe(request.getVibe());
-            spot.setLocation(spatialPoint); // Seamlessly binds to Point property
-            spot.setIntensity(0.0); // Will be updated to 0.1 after check-in
+                spot = new Spot();
+                spot.setName(request.getName());
+                spot.setVibe(request.getVibe());
+                spot.setLocation(spatialPoint);
+                spot.setIntensity(0.0);
 
-            spot = spotRepository.save(spot);
+                spot = spotRepository.save(spot);
+            }
         } else {
             spot = spotRepository.findById(Long.parseLong(request.getId()))
                     .orElseThrow(() -> new RuntimeException("Spot not found"));
         }
 
         // 🛡️ Spam Protection: Check for recent check-ins belonging to this user
-        CheckIn lastCheckIn = checkInRepository.findFirstBySpotIdAndUserIdOrderByCheckInTimeDesc(spot.getId(), user.getId());
+        CheckIn lastCheckIn = checkInRepository.findFirstBySpotIdAndUserIdOrderByCheckInTimeDesc(spot.getId(),
+                user.getId());
 
         if (lastCheckIn != null) {
             LocalDateTime limit = LocalDateTime.now().minusSeconds(1); // Same threshold as existing config
@@ -152,7 +163,7 @@ public class CheckInController {
 
         double currentIntensity = spot.getIntensity() != null ? spot.getIntensity() : 0.0;
         double updatedIntensity = Math.min(1.0, currentIntensity + 0.1);
-        
+
         spot.setIntensity(updatedIntensity);
         spotRepository.save(spot); // Update the source
 

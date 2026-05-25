@@ -36,6 +36,7 @@ export default function MapScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [currentCity, setCurrentCity] = useState<string | null>(null);
+  const [isCheckingIn, setIsCheckingIn] = useState(false);
 
   const [alertConfig, setAlertConfig] = useState<{ msg: string; type: 'error' | 'warning' | 'success' | null }>({ msg: '', type: null });
   const slideAnim = useRef(new Animated.Value(-100)).current; // Start off-screen
@@ -304,6 +305,7 @@ export default function MapScreen() {
       Alert.alert("GPS Loading", "Wait a second for your location to lock in.");
       return;
     }
+    if (isCheckingIn) return;
 
     const spotId = selectedSpot.properties.id;
     const spotCoords = selectedSpot.geometry.coordinates;
@@ -319,6 +321,7 @@ export default function MapScreen() {
       return;
     }
 
+    setIsCheckingIn(true);
     try {
       const response = await fetch(`${API_URL}/api/checkins/checkins`, {
         method: 'POST',
@@ -343,6 +346,8 @@ export default function MapScreen() {
       }
     } catch (error) {
       console.error(error);
+    } finally {
+      setIsCheckingIn(false);
     }
   };
 
@@ -442,11 +447,11 @@ export default function MapScreen() {
             {/* LAYER 1: Dynamic Pulsing Wave (The Background Ripple) */}
             <Mapbox.Animated.CircleLayer
               id="spots-pulse-wave"
+              filter={['>', ['get', 'intensity'], 0]}
               style={{
                 circleRadius: pulseRadius,
                 circleColor: '#FB923C',
-                // FIX: Multiply the global animation value by the feature's unique intensity metric
-                circleOpacity: ['*', pulseOpacity, ['get', 'intensity']],
+                circleOpacity: pulseOpacity,
                 circleBlur: 0.4,
                 circleOpacityTransition: { duration: 0 },
                 circleRadiusTransition: { duration: 0 }
