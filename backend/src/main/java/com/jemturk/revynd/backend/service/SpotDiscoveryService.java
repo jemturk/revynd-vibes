@@ -19,7 +19,7 @@ import com.jemturk.revynd.backend.repository.SpotRepository;
 @Service
 public class SpotDiscoveryService {
 
-    @Value("${mapbox.access.token}")
+    @Value("${mapbox.access.token:}")
     private String mapboxToken;
 
     @Autowired
