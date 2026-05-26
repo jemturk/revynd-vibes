@@ -3,7 +3,7 @@ import withMapboxStrings from './plugins/withMapboxStrings.js';
 
 export default {
   "expo": {
-    "name": "RevyndApp",
+    "name": "Revynd",
     "slug": "RevyndApp",
     "scheme": "revynd",
     "version": "1.0.0",
