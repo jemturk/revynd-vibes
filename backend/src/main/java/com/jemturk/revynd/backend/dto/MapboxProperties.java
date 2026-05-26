@@ -48,8 +48,13 @@ public class MapboxProperties {
                 return "Cafe";
             } else if (category.contains("bar") || category.contains("nightlife") || category.contains("club") || category.contains("pub")) {
                 return "Bar";
+            } else if (category.contains("restaurant") || category.contains("food")) {
+                return "Restaurant";
+            } else if (category.contains("tennis")) {
+                return "Tennis";
             }
-            return category;
+            // Capitalize first letter of unknown categories as a fallback
+            return category.substring(0, 1).toUpperCase() + category.substring(1);
         }
         return "Spot";
     }

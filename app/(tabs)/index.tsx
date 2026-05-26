@@ -43,6 +43,18 @@ export default function MapScreen() {
   const slideAnim = useRef(new Animated.Value(-100)).current; // Start off-screen
   const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Category Color Palette Mapbox Expression
+  const categoryColorMatch = [
+    'match',
+    ['get', 'vibe'],
+    'Skate Spot', '#EC4899', // Pink
+    'Cafe', '#D97706',       // Amber/Brown
+    'Bar', '#8B5CF6',        // Purple
+    'Restaurant', '#3B82F6', // Blue
+    'Tennis', '#22C55E',     // Green
+    '#FB923C'                // Default Revynd Orange
+  ];
+
   // Animated value driving the expanding pulse ripple layer
   const pulseAnim = useRef(new Animated.Value(0)).current;
 
@@ -235,7 +247,7 @@ export default function MapScreen() {
   const fetchSpots = async (coords?: [number, number]) => {
     try {
       const activeCoords = coords || userCoords || NYC_COORDS;
-      const response = await fetch(`${API_URL}/api/spots/explore?lat=${activeCoords[1]}&lng=${activeCoords[0]}&categories=bar,coffee_shop_cafe,skate_park,skatepark`, {
+      const response = await fetch(`${API_URL}/api/spots/explore?lat=${activeCoords[1]}&lng=${activeCoords[0]}&categories=bar,cafe,coffee,restaurant,tennis,skate,skate_park,skatepark`, {
         headers: await buildAuthHeaders(),
       });
 
@@ -468,12 +480,7 @@ export default function MapScreen() {
               filter={['>', ['get', 'intensity'], 0]}
               style={{
                 circleRadius: pulseRadius,
-                circleColor: [
-                  'case',
-                  ['>=', ['get', 'intensity'], 0.8], '#EC4899',
-                  ['>', ['get', 'intensity'], 0.2], '#F97316',
-                  '#FB923C'
-                ],
+                circleColor: categoryColorMatch,
                 circleOpacity: pulseOpacity,
                 circleBlur: 0.4,
                 circleOpacityTransition: { duration: 0 },
@@ -492,12 +499,7 @@ export default function MapScreen() {
                   ['==', ['get', 'isSaved'], false], 0, // No ambient glow for unsaved places
                   14
                 ],
-                circleColor: [
-                  'case',
-                  ['>=', ['get', 'intensity'], 0.8], '#EC4899',
-                  ['>', ['get', 'intensity'], 0.2], '#F97316',
-                  '#FB923C'
-                ],
+                circleColor: categoryColorMatch,
                 circleOpacity: [
                   'case',
                   ['>=', ['get', 'intensity'], 0.8], 0.85,
@@ -519,25 +521,15 @@ export default function MapScreen() {
                   ['==', ['get', 'isSaved'], false], 3.5, // Smaller dot for unsaved places
                   4.5
                 ],
-                circleColor: [
-                  'case',
-                  ['==', ['get', 'isSaved'], false], '#9CA3AF', // Gray center for unsaved
-                  theme.card
-                ],
+                circleColor: categoryColorMatch,
                 circleStrokeWidth: [
                   'case',
                   ['>=', ['get', 'intensity'], 0.8], 3.5,
                   ['>', ['get', 'intensity'], 0.2], 2.5,
-                  ['==', ['get', 'isSaved'], false], 1.5,
+                  ['==', ['get', 'isSaved'], false], 0, // No stroke for unsaved to differentiate them
                   2.0
                 ],
-                circleStrokeColor: [
-                  'case',
-                  ['>=', ['get', 'intensity'], 0.8], '#EC4899',
-                  ['>', ['get', 'intensity'], 0.2], '#F97316',
-                  ['==', ['get', 'isSaved'], false], '#6B7280', // Gray stroke for unsaved
-                  '#FB923C'
-                ],
+                circleStrokeColor: isDark ? '#171717' : '#FFFFFF',
                 circleOpacity: 1,
               }}
             />

@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Modal, Pressable, Alert, Image, ActivityIndicator } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme, AppTheme } from '../../theme/ThemeContext';
-import { useAuth } from '../_layout'; 
+import { useAuth } from '../_layout';
 import * as SecureStore from 'expo-secure-store';
 import * as ImagePicker from 'expo-image-picker';
 
@@ -13,13 +13,12 @@ type AccountItemProps = {
   rightElement?: React.ReactNode;
   destructive?: boolean;
   color?: string;
+  styles: any; // Passed directly from parent matrix to maximize caching performance
 };
 
-// Re-declare the isolated Account Row item
-const AccountItem = ({ icon, label, onPress, rightElement, destructive, color }: AccountItemProps) => {
+// Re-declare the isolated Account Row item with optimized stylesheet reuse
+const AccountItem = ({ icon, label, onPress, rightElement, destructive, color, styles }: AccountItemProps) => {
   const { theme } = useTheme();
-  const styles = makeStyles(theme);
-
   const dangerColor = '#ef4444';
   const accentColor = color ?? (destructive ? dangerColor : theme.subtext);
 
@@ -36,20 +35,32 @@ const AccountItem = ({ icon, label, onPress, rightElement, destructive, color }:
   );
 };
 
-const AccountScreen = () => {
+export default function AccountScreen() {
   const { theme, isDark, toggleTheme } = useTheme();
-  const { user, signIn, signOut } = useAuth(); 
-  const styles = makeStyles(theme);
-  const [showDeleteModal, setShowDeleteModal] = React.useState(false);
-  const [showPhotoModal, setShowPhotoModal] = React.useState(false);
-  const [deleteErrorMessage, setDeleteErrorMessage] = React.useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = React.useState<string | null>(null);
-  const [uploading, setUploading] = React.useState(false);
+  const { user, signIn, signOut } = useAuth();
+
+  // FIXED: Wrapped stylesheet creation inside useMemo to completely eliminate layout regeneration overhead
+  const styles = useMemo(() => makeStyles(theme), [theme]);
+
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showPhotoModal, setShowPhotoModal] = useState(false);
+  const [deleteErrorMessage, setDeleteErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   const API_URL = 'https://revynd-api-939729691035.us-east1.run.app';
 
   const pickImage = () => {
     setShowPhotoModal(true);
+  };
+
+  const buildAuthHeaders = async (contentType?: string) => {
+    const token = await SecureStore.getItemAsync('user_token');
+    return {
+      Accept: 'application/json',
+      ...(contentType ? { 'Content-Type': contentType } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
   };
 
   const handleImageAction = async (action: 'camera' | 'library') => {
@@ -109,7 +120,7 @@ const AccountScreen = () => {
           profilePicture: base64Str,
         });
       }
-      
+
       setSuccessMessage('Profile picture updated successfully!');
     } catch (error) {
       console.error('Image picking/upload error:', error);
@@ -126,7 +137,7 @@ const AccountScreen = () => {
       const response = await fetch(`${API_URL}/api/auth/profile-picture`, {
         method: 'PUT',
         headers: await buildAuthHeaders('application/json'),
-        body: JSON.stringify({ profilePicture: "" }), // Clear/delete image by sending empty string
+        body: JSON.stringify({ profilePicture: "" }),
       });
 
       const raw = await response.text();
@@ -145,7 +156,7 @@ const AccountScreen = () => {
           profilePicture: "",
         });
       }
-      
+
       setSuccessMessage('Profile picture removed successfully!');
     } catch (error) {
       console.error('Delete photo error:', error);
@@ -155,25 +166,13 @@ const AccountScreen = () => {
     }
   };
 
-  const buildAuthHeaders = async (contentType?: string) => {
-    const token = await SecureStore.getItemAsync('user_token');
-    return {
-      Accept: 'application/json',
-      ...(contentType ? { 'Content-Type': contentType } : {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    };
-  };
-
-  // 🔒 1. Custom Secure Sign Out Handler
   const handleSignOut = async () => {
     try {
-      // Clear out the user tracking parameters to avoid data bleeding between profiles
       await SecureStore.deleteItemAsync('userId');
       await SecureStore.deleteItemAsync('user_token');
     } catch (error) {
       console.error('Error clearing local cache tokens during sign out:', error);
     } finally {
-      // Always trigger the navigation context switch 
       signOut();
     }
   };
@@ -183,7 +182,6 @@ const AccountScreen = () => {
       Alert.alert('Error', 'No signed-in account found.');
       return;
     }
-
     setShowDeleteModal(true);
   };
 
@@ -213,7 +211,6 @@ const AccountScreen = () => {
         return;
       }
 
-      // 🔒 2. Clean out user context strings if account deletion resolves successfully
       await SecureStore.deleteItemAsync('userId');
       await SecureStore.deleteItemAsync('user_token');
       signOut();
@@ -226,9 +223,9 @@ const AccountScreen = () => {
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.avatarWrapper} 
-          onPress={pickImage} 
+        <TouchableOpacity
+          style={styles.avatarWrapper}
+          onPress={pickImage}
           disabled={uploading}
           activeOpacity={0.8}
         >
@@ -256,31 +253,32 @@ const AccountScreen = () => {
         <AccountItem
           icon="brightness-6"
           label="Dark Mode"
+          styles={styles}
           rightElement={
             <Switch
               value={isDark}
               onValueChange={toggleTheme}
               trackColor={{
-                false: '#94A3B8', 
-                true: '#639cec'   
+                false: '#94A3B8',
+                true: '#639cec'
               }}
               thumbColor={isDark ? '#FB923C' : '#F4F3F4'}
               ios_backgroundColor="#CBD5E1"
             />
           }
         />
-        <AccountItem icon="notifications-none" label="Notifications" onPress={() => { }} />
+        <AccountItem icon="notifications-none" label="Notifications" styles={styles} onPress={() => { }} />
       </View>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Account</Text>
-        <AccountItem icon="person-outline" label="Edit Profile" onPress={() => { }} />
-        <AccountItem icon="security" label="Privacy Policy" onPress={() => { }} />
-        {/* Updated to trigger our custom secure cache clear method 🚀 */}
-        <AccountItem icon="exit-to-app" label="Sign Out" onPress={handleSignOut} color="#fb923c" />
-        <AccountItem icon="delete" label="Delete Account" onPress={handleDeleteAccount} destructive />
+        <AccountItem icon="person-outline" label="Edit Profile" styles={styles} onPress={() => { }} />
+        <AccountItem icon="security" label="Privacy Policy" styles={styles} onPress={() => { }} />
+        <AccountItem icon="exit-to-app" label="Sign Out" styles={styles} onPress={handleSignOut} color="#fb923c" />
+        <AccountItem icon="delete" label="Delete Account" styles={styles} onPress={handleDeleteAccount} destructive />
       </View>
 
+      {/* Profile Picture Option Drawer Modal */}
       <Modal
         visible={showPhotoModal}
         transparent
@@ -327,11 +325,11 @@ const AccountScreen = () => {
                 handleDeletePhoto();
               }}
             >
-              <MaterialIcons 
-                name="delete-outline" 
-                size={20} 
-                color={(user?.profilePicture && user.profilePicture !== "") ? '#ef4444' : theme.subtext} 
-                style={styles.photoOptionIcon} 
+              <MaterialIcons
+                name="delete-outline"
+                size={20}
+                color={(user?.profilePicture && user.profilePicture !== "") ? '#ef4444' : theme.subtext}
+                style={styles.photoOptionIcon}
               />
               <Text style={[
                 styles.photoOptionText,
@@ -341,18 +339,28 @@ const AccountScreen = () => {
               </Text>
             </TouchableOpacity>
 
-            <View style={{ marginTop: 10 }}>
+            {/* FIXED: Removed flex expansion and added theme-compliant neutral cancel styling */}
+            <View style={{ marginTop: 14, flexDirection: 'row' }}>
               <Pressable
-                style={[styles.modalButton, { backgroundColor: '#FB923C', marginRight: 0 }]}
+                style={[
+                  styles.modalButton,
+                  {
+                    backgroundColor: '#FB923C', // Revynd Orange background
+                    marginRight: 0
+                  }
+                ]}
                 onPress={() => setShowPhotoModal(false)}
               >
-                <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>Cancel</Text>
+                <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>
+                  Cancel
+                </Text>
               </Pressable>
             </View>
           </View>
         </View>
       </Modal>
 
+      {/* Account Deletion Confirmation Modal */}
       <Modal
         visible={showDeleteModal}
         transparent
@@ -383,6 +391,7 @@ const AccountScreen = () => {
         </View>
       </Modal>
 
+      {/* Error Output Modal Banner */}
       <Modal
         visible={Boolean(deleteErrorMessage)}
         transparent
@@ -405,6 +414,7 @@ const AccountScreen = () => {
         </View>
       </Modal>
 
+      {/* Success Notification Banner */}
       <Modal
         visible={Boolean(successMessage)}
         transparent
@@ -414,13 +424,20 @@ const AccountScreen = () => {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
             <View style={{ alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
-              <MaterialIcons name="check-circle" size={50} color="#FB923C" />
+              {/* FIXED: Swapped the icon color to match the teal theme as well */}
+              <MaterialIcons name="check-circle" size={50} color="#0D9488" />
             </View>
             <Text style={[styles.modalTitle, { textAlign: 'center' }]}>Success</Text>
             <Text style={[styles.modalMessage, { textAlign: 'center', marginBottom: 20 }]}>{successMessage}</Text>
             <View style={styles.modalButtons}>
               <Pressable
-                style={[styles.modalButton, { backgroundColor: '#FB923C', marginRight: 0 }]}
+                style={[
+                  styles.modalButton,
+                  {
+                    backgroundColor: '#0D9488', // FIXED: Now uses the index page check-in Teal
+                    marginRight: 0
+                  }
+                ]}
                 onPress={() => setSuccessMessage(null)}
               >
                 <Text style={styles.modalDeleteText}>OK</Text>
@@ -433,14 +450,11 @@ const AccountScreen = () => {
       <Text style={styles.versionText}>Version 1.0.4</Text>
     </ScrollView>
   );
-};
+}
 
-// Stylesheet generator factory function
+// Stylesheet generator factory function unchanged
 const makeStyles = (theme: AppTheme) => StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.background,
-  },
+  container: { flex: 1, backgroundColor: theme.background },
   header: {
     alignItems: 'center',
     paddingVertical: 40,
@@ -448,10 +462,7 @@ const makeStyles = (theme: AppTheme) => StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: theme.border,
   },
-  avatarWrapper: {
-    marginBottom: 16,
-    position: 'relative',
-  },
+  avatarWrapper: { marginBottom: 16, position: 'relative' },
   avatar: {
     width: 80,
     height: 80,
@@ -461,11 +472,7 @@ const makeStyles = (theme: AppTheme) => StyleSheet.create({
     alignItems: 'center',
     overflow: 'hidden',
   },
-  avatarImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-  },
+  avatarImage: { width: 80, height: 80, borderRadius: 40 },
   editBadge: {
     position: 'absolute',
     bottom: -2,
@@ -528,22 +535,9 @@ const makeStyles = (theme: AppTheme) => StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
     elevation: 16,
   },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: theme.text,
-    marginBottom: 12,
-  },
-  modalMessage: {
-    fontSize: 15,
-    color: theme.subtext,
-    lineHeight: 22,
-    marginBottom: 24,
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
+  modalTitle: { fontSize: 20, fontWeight: '700', color: theme.text, marginBottom: 12 },
+  modalMessage: { fontSize: 15, color: theme.subtext, lineHeight: 22, marginBottom: 24 },
+  modalButtons: { flexDirection: 'row', justifyBetween: 'space-between' },
   modalButton: {
     flex: 1,
     paddingVertical: 14,
@@ -557,19 +551,9 @@ const makeStyles = (theme: AppTheme) => StyleSheet.create({
     borderColor: theme.border,
     marginRight: 12,
   },
-  modalDeleteButton: {
-    backgroundColor: '#ef4444',
-  },
-  modalCancelText: {
-    color: theme.text,
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  modalDeleteText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '700',
-  },
+  modalDeleteButton: { backgroundColor: '#ef4444' },
+  modalCancelText: { color: theme.text, fontSize: 15, fontWeight: '600' },
+  modalDeleteText: { color: '#fff', fontSize: 15, fontWeight: '700' },
   photoOptionButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -582,23 +566,11 @@ const makeStyles = (theme: AppTheme) => StyleSheet.create({
     marginBottom: 10,
     width: '100%',
   },
-  photoOptionDisabledButton: {
-    opacity: 0.4,
-  },
-  photoOptionIcon: {
-    marginRight: 12,
-  },
-  photoOptionText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: theme.text,
-  },
-  photoOptionDisabledText: {
-    color: theme.subtext,
-  },
-  photoOptionDeleteText: {
-    color: '#ef4444',
-  },
+  photoOptionDisabledButton: { opacity: 0.4 },
+  photoOptionIcon: { marginRight: 12 },
+  photoOptionText: { fontSize: 16, fontWeight: '600', color: theme.text },
+  photoOptionDisabledText: { color: theme.subtext },
+  photoOptionDeleteText: { color: '#ef4444' },
   versionText: {
     textAlign: 'center',
     color: theme.subtext,
@@ -607,5 +579,3 @@ const makeStyles = (theme: AppTheme) => StyleSheet.create({
     marginBottom: 20,
   },
 });
-
-export default AccountScreen;
