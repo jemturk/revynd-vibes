@@ -65,9 +65,11 @@ public class CheckInController {
             }
         }
 
-        double currentIntensity = spot.getIntensity() != null ? spot.getIntensity() : 0.0;
-        // Add 10% for every new check-in, capping at 1.0 (100%)
-        double updatedIntensity = Math.min(1.0, currentIntensity + 0.1);
+        // Calculate actual intensity based on recent check-ins in the database (including this new one)
+        LocalDateTime oneHourAgo = LocalDateTime.now().minusHours(1);
+        List<CheckIn> recentCheckIns = checkInRepository.findBySpotIdAndCheckInTimeAfter(spotId, oneHourAgo);
+        long count = recentCheckIns.size() + 1; // recent check-ins + this new one
+        double updatedIntensity = Math.min(1.0, count * 0.05);
 
         spot.setIntensity(updatedIntensity);
         spotRepository.save(spot); // Update the source
@@ -161,8 +163,11 @@ public class CheckInController {
             }
         }
 
-        double currentIntensity = spot.getIntensity() != null ? spot.getIntensity() : 0.0;
-        double updatedIntensity = Math.min(1.0, currentIntensity + 0.1);
+        // Calculate actual intensity based on recent check-ins in the database (including this new one)
+        LocalDateTime oneHourAgo = LocalDateTime.now().minusHours(1);
+        List<CheckIn> recentCheckIns = checkInRepository.findBySpotIdAndCheckInTimeAfter(spot.getId(), oneHourAgo);
+        long count = recentCheckIns.size() + 1; // recent check-ins + this new one
+        double updatedIntensity = Math.min(1.0, count * 0.05);
 
         spot.setIntensity(updatedIntensity);
         spotRepository.save(spot); // Update the source

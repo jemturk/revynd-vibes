@@ -61,9 +61,9 @@ public class IntensityDecayService {
             double newIntensity;
 
             if (checkInCountBySpot.containsKey(spot)) {
-                // Spot has recent check-ins: intensity = min(1.0, count * 0.1)
+                // Spot has recent check-ins: intensity = min(1.0, count * 0.05)
                 long count = checkInCountBySpot.get(spot);
-                newIntensity = Math.min(1.0, count * 0.1);
+                newIntensity = Math.min(1.0, count * 0.05);
                 log.debug("Updated spot {} intensity to {} based on {} check-ins",
                         spot.getId(),
                         newIntensity,

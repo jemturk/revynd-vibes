@@ -428,6 +428,12 @@ export default function MapScreen() {
             setSelectedSpot(null);
             bottomSheetRef.current?.snapToIndex(0);
           }}
+          onMapIdle={(e: any) => {
+            if (e?.properties?.center) {
+              const center = e.properties.center as [number, number];
+              fetchSpots(center);
+            }
+          }}
         >
           <Mapbox.UserLocation visible />
 
@@ -450,7 +456,12 @@ export default function MapScreen() {
               filter={['>', ['get', 'intensity'], 0]}
               style={{
                 circleRadius: pulseRadius,
-                circleColor: '#FB923C',
+                circleColor: [
+                  'case',
+                  ['>=', ['get', 'intensity'], 0.8], '#EC4899',
+                  ['>', ['get', 'intensity'], 0.2], '#F97316',
+                  '#FB923C'
+                ],
                 circleOpacity: pulseOpacity,
                 circleBlur: 0.4,
                 circleOpacityTransition: { duration: 0 },
@@ -462,9 +473,24 @@ export default function MapScreen() {
             <Mapbox.CircleLayer
               id="spots-ambient-glow"
               style={{
-                circleRadius: 28,
-                circleColor: '#FB923C',
-                circleOpacity: ['*', ['get', 'intensity'], 0.7],
+                circleRadius: [
+                  'case',
+                  ['>=', ['get', 'intensity'], 0.8], 52,
+                  ['>', ['get', 'intensity'], 0.2], 30,
+                  14
+                ],
+                circleColor: [
+                  'case',
+                  ['>=', ['get', 'intensity'], 0.8], '#EC4899',
+                  ['>', ['get', 'intensity'], 0.2], '#F97316',
+                  '#FB923C'
+                ],
+                circleOpacity: [
+                  'case',
+                  ['>=', ['get', 'intensity'], 0.8], 0.85,
+                  ['>', ['get', 'intensity'], 0.2], 0.5,
+                  0.15
+                ],
                 circleBlur: 0.8,
               }}
             />
@@ -473,10 +499,25 @@ export default function MapScreen() {
             <Mapbox.CircleLayer
               id="spots-anchor"
               style={{
-                circleRadius: 6,
+                circleRadius: [
+                  'case',
+                  ['>=', ['get', 'intensity'], 0.8], 8,
+                  ['>', ['get', 'intensity'], 0.2], 6,
+                  4.5
+                ],
                 circleColor: theme.card,
-                circleStrokeWidth: 2.5,
-                circleStrokeColor: '#FB923C',
+                circleStrokeWidth: [
+                  'case',
+                  ['>=', ['get', 'intensity'], 0.8], 3.5,
+                  ['>', ['get', 'intensity'], 0.2], 2.5,
+                  2.0
+                ],
+                circleStrokeColor: [
+                  'case',
+                  ['>=', ['get', 'intensity'], 0.8], '#EC4899',
+                  ['>', ['get', 'intensity'], 0.2], '#F97316',
+                  '#FB923C'
+                ],
                 circleOpacity: 1,
               }}
             />

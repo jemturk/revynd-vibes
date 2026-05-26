@@ -69,8 +69,8 @@ public class SpotController {
         return allSpots.stream().map(spot -> {
             long count = countsMap.getOrDefault(spot.getId(), 0L);
 
-            // Logic: 5 check-ins in the last hour = 1.0 (max glow)
-            // Each check-in adds 0.2 to the intensity
+            // Logic: 20 check-ins in the last hour = 1.0 (max glow)
+            // Each check-in adds 0.05 to the intensity
             double intensity = Math.min(1.0, count * 0.05);
 
             return new SpotRecord(
