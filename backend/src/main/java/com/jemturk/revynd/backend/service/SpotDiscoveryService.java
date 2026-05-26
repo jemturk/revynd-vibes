@@ -63,7 +63,8 @@ public class SpotDiscoveryService {
                     SpotResponseDTO transientSpot = new SpotResponseDTO();
                     transientSpot.setId("transient-" + feature.getProperties().getMapboxId());
                     transientSpot.setName(name);
-                    transientSpot.setVibe(feature.getProperties().getCategoryString());
+                    transientSpot.setCategory(feature.getProperties().getCategoryString());
+                    transientSpot.setVibe("");
                     transientSpot.setIntensity(0.0); // No check-ins yet = dead vibe glow
                     transientSpot.setLocation(feature.getGeometry().getCoordinates()); // [Lng, Lat]
                     transientSpot.setSaved(false);

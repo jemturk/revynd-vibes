@@ -141,6 +141,7 @@ public class CheckInController {
                 spot = new Spot();
                 spot.setName(request.getName());
                 spot.setVibe(request.getVibe());
+                spot.setCategory(request.getCategory());
                 spot.setLocation(spatialPoint);
                 spot.setIntensity(0.0);
 

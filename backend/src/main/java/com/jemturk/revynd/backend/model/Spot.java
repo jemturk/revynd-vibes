@@ -15,6 +15,7 @@ public class Spot {
 
     private String name;
     private String vibe;
+    private String category;
     private Double intensity;
 
     @Column(columnDefinition = "geometry(Point, 4326)")
@@ -50,6 +51,14 @@ public class Spot {
 
     public void setVibe(String vibe) {
         this.vibe = vibe;
+    }
+
+    public String getCategory() {
+        return category;
+    }
+
+    public void setCategory(String category) {
+        this.category = category;
     }
 
     public Double getIntensity() {

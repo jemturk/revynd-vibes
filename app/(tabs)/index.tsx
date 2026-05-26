@@ -20,6 +20,7 @@ type SpotFeature = Feature<Point, {
   id: string;
   name: string;
   vibe: string;
+  category: string;
   intensity: number;
   isSaved: boolean;
 }>;
@@ -46,7 +47,7 @@ export default function MapScreen() {
   // Category Color Palette Mapbox Expression
   const categoryColorMatch = [
     'match',
-    ['get', 'vibe'],
+    ['get', 'category'],
     'Skate Spot', '#EC4899', // Pink
     'Cafe', '#D97706',       // Amber/Brown
     'Bar', '#8B5CF6',        // Purple
@@ -238,6 +239,7 @@ export default function MapScreen() {
     id: string;
     name: string;
     vibe: string;
+    category: string;
     intensity: number;
   }>>({
     type: 'FeatureCollection',
@@ -268,6 +270,7 @@ export default function MapScreen() {
           id: spot.id,
           name: spot.name,
           vibe: spot.vibe,
+          category: spot.category,
           intensity: spot.intensity,
           isSaved: spot.saved,
         },
@@ -345,6 +348,7 @@ export default function MapScreen() {
           id: spotId,
           name: selectedSpot.properties.name,
           vibe: selectedSpot.properties.vibe,
+          category: selectedSpot.properties.category,
           location: [spotCoords[0], spotCoords[1]],
         }),
       });
@@ -597,7 +601,7 @@ export default function MapScreen() {
                     {displaySpot.properties.name} 🧭
                   </Text>
                   <Text style={styles.subtitle}>
-                    {displaySpot.properties.vibe}
+                    {displaySpot.properties.category} {displaySpot.properties.vibe ? `• ${displaySpot.properties.vibe}` : ''}
                   </Text>
 
                   <View style={styles.spotCard}>

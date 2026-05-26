@@ -7,6 +7,7 @@ public class SpotResponseDTO {
     private String id;
     private String name;
     private String vibe;
+    private String category;
     private double intensity;
     private double[] location; // [Longitude, Latitude]
     private boolean isSaved;
@@ -18,6 +19,7 @@ public class SpotResponseDTO {
         this.id = String.valueOf(spot.getId());
         this.name = spot.getName();
         this.vibe = spot.getVibe();
+        this.category = spot.getCategory();
         this.intensity = spot.getIntensity() != null ? spot.getIntensity() : 0.0;
         this.isSaved = isSaved;
 
@@ -50,6 +52,14 @@ public class SpotResponseDTO {
 
     public void setVibe(String vibe) {
         this.vibe = vibe;
+    }
+
+    public String getCategory() {
+        return category;
+    }
+
+    public void setCategory(String category) {
+        this.category = category;
     }
 
     public double getIntensity() {

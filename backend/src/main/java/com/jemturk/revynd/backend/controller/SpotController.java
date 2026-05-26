@@ -77,6 +77,7 @@ public class SpotController {
                     spot.getId(),
                     spot.getName(),
                     spot.getVibe(),
+                    spot.getCategory(),
                     spot.getLocation(),
                     intensity);
         }).collect(Collectors.toList());
