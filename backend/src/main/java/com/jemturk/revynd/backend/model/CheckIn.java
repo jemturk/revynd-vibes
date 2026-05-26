@@ -33,6 +33,9 @@ public class CheckIn {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
+    @Column(name = "vibe_tag")
+    private String vibeTag;
+
     @PrePersist
     protected void onCreate() {
         checkInTime = LocalDateTime.now();

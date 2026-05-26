@@ -3,17 +3,17 @@ package com.jemturk.revynd.backend.dto;
 public class CheckInRequestDTO {
     private String id;
     private String name;
-    private String vibe;
+    private String vibeTag;
     private String category;
     private double[] location;
 
     public CheckInRequestDTO() {
     }
 
-    public CheckInRequestDTO(String id, String name, String vibe, String category, double[] location) {
+    public CheckInRequestDTO(String id, String name, String vibeTag, String category, double[] location) {
         this.id = id;
         this.name = name;
-        this.vibe = vibe;
+        this.vibeTag = vibeTag;
         this.category = category;
         this.location = location;
     }
@@ -35,12 +35,12 @@ public class CheckInRequestDTO {
         this.name = name;
     }
 
-    public String getVibe() {
-        return vibe;
+    public String getVibeTag() {
+        return vibeTag;
     }
 
-    public void setVibe(String vibe) {
-        this.vibe = vibe;
+    public void setVibeTag(String vibeTag) {
+        this.vibeTag = vibeTag;
     }
 
     public String getCategory() {

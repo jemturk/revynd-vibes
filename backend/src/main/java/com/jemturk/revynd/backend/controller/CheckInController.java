@@ -3,6 +3,8 @@ package com.jemturk.revynd.backend.controller;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import java.util.Map;
+import java.util.stream.Collectors;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -140,7 +142,6 @@ public class CheckInController {
 
                 spot = new Spot();
                 spot.setName(request.getName());
-                spot.setVibe(request.getVibe());
                 spot.setCategory(request.getCategory());
                 spot.setLocation(spatialPoint);
                 spot.setIntensity(0.0);
@@ -176,9 +177,26 @@ public class CheckInController {
         // Save the new check-in
         CheckIn checkIn = new CheckIn();
         checkIn.setSpot(spot);
+        checkIn.setVibeTag(request.getVibeTag());
         checkIn.setIntensityAtTime(spot.getIntensity());
         checkIn.setUser(user);
         checkInRepository.save(checkIn);
+
+        // Include this check-in in the recent list for mode calculation
+        recentCheckIns.add(checkIn);
+
+        // Calculate the most popular vibe tag in the last hour
+        String mostCommonVibe = recentCheckIns.stream()
+                .map(CheckIn::getVibeTag)
+                .filter(v -> v != null && !v.trim().isEmpty())
+                .collect(Collectors.groupingBy(v -> v, Collectors.counting()))
+                .entrySet().stream()
+                .max(Map.Entry.comparingByValue())
+                .map(Map.Entry::getKey)
+                .orElse(spot.getVibe());
+
+        spot.setVibe(mostCommonVibe);
+        spotRepository.save(spot); // Update the spot with new vibe and intensity
 
         return ResponseEntity.ok("Check-in successful");
     }

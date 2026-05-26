@@ -19,7 +19,7 @@ import { useTheme } from '../../theme/ThemeContext';
 interface CheckInRecord {
   id: number;
   spotName: string;
-  vibe: string;
+  vibeTag: string;
   checkInTime: string;
   intensityAtTime: number;
 }
@@ -260,7 +260,7 @@ const HistoryScreen = () => {
                 </View>
                 <View>
                   <Text style={styles.spotName}>{item.spotName}</Text>
-                  <Text style={styles.vibeType}>{item.vibe} Session</Text>
+                  <Text style={styles.vibeType}>{item.vibeTag ? `${item.vibeTag} Vibe` : 'Checked In'}</Text>
                   <Text style={styles.timeText}>
                     {date.toLocaleDateString()} •{' '}
                     {date.toLocaleTimeString([], {

@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react';
-import { StyleSheet, View, Text, Alert, TouchableOpacity, ActivityIndicator, Animated, Easing, StatusBar } from 'react-native';
+import { StyleSheet, View, Text, Alert, TouchableOpacity, ActivityIndicator, Animated, Easing, StatusBar, ScrollView, Modal } from 'react-native';
 import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Mapbox from '@rnmapbox/maps';
@@ -11,6 +11,17 @@ import * as SecureStore from 'expo-secure-store';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../../theme/ThemeContext';
+
+const VIBE_TAGS_BY_CATEGORY: Record<string, string[]> = {
+  'Cafe': ['Cozy', 'Packed', 'Great for working', 'Loud'],
+  'Bar': ['Live Music', 'Chill', 'Rowdy', 'Happy Hour'],
+  'Restaurant': ['Date Night', 'Bustling', 'Quick Bite', 'Fancy'],
+  'Skate Spot': ['Empty', 'Packed', 'Session going down', 'Chill'],
+  'Tennis': ['Courts open', 'Packed', 'Tourney', 'Chill'],
+  'default': ['Lit', 'Chill', 'Packed', 'Dead']
+};
+
+const ALL_CATEGORIES = Object.keys(VIBE_TAGS_BY_CATEGORY).filter(c => c !== 'default');
 
 const API_URL = 'https://revynd-api-939729691035.us-east1.run.app';
 
@@ -39,6 +50,9 @@ export default function MapScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [currentCity, setCurrentCity] = useState<string | null>(null);
   const [isCheckingIn, setIsCheckingIn] = useState(false);
+  const [showVibeSelection, setShowVibeSelection] = useState(false);
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string | null>(null);
+  const [showFilterModal, setShowFilterModal] = useState(false);
 
   const [alertConfig, setAlertConfig] = useState<{ msg: string; type: 'error' | 'warning' | 'success' | null }>({ msg: '', type: null });
   const slideAnim = useRef(new Animated.Value(-100)).current; // Start off-screen
@@ -297,6 +311,10 @@ export default function MapScreen() {
     fetchSpots();
   }, []);
 
+  useEffect(() => {
+    setShowVibeSelection(false);
+  }, [selectedSpot]);
+
   const handleRefresh = () => {
     setIsRefreshing(true);
     fetchSpots(userCoords || undefined);
@@ -318,7 +336,7 @@ export default function MapScreen() {
     return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
   };
 
-  const handleCheckIn = async () => {
+  const handleCheckIn = async (selectedTag: string) => {
     if (!userCoords || !selectedSpot) {
       Alert.alert("GPS Loading", "Wait a second for your location to lock in.");
       return;
@@ -339,6 +357,7 @@ export default function MapScreen() {
       return;
     }
 
+    setShowVibeSelection(false);
     setIsCheckingIn(true);
     try {
       const response = await fetch(`${API_URL}/api/checkins/checkins`, {
@@ -347,7 +366,7 @@ export default function MapScreen() {
         body: JSON.stringify({
           id: spotId,
           name: selectedSpot.properties.name,
-          vibe: selectedSpot.properties.vibe,
+          vibeTag: selectedTag,
           category: selectedSpot.properties.category,
           location: [spotCoords[0], spotCoords[1]],
         }),
@@ -481,7 +500,11 @@ export default function MapScreen() {
             {/* LAYER 1: Dynamic Pulsing Wave (The Background Ripple) */}
             <Mapbox.Animated.CircleLayer
               id="spots-pulse-wave"
-              filter={['>', ['get', 'intensity'], 0]}
+              filter={
+                selectedCategoryFilter
+                  ? ['all', ['>', ['get', 'intensity'], 0], ['==', ['get', 'category'], selectedCategoryFilter]]
+                  : ['>', ['get', 'intensity'], 0]
+              }
               style={{
                 circleRadius: pulseRadius,
                 circleColor: categoryColorMatch,
@@ -495,6 +518,7 @@ export default function MapScreen() {
             {/* LAYER 2: Core Base Glow (Static ambient blur scaled by backend intensity) */}
             <Mapbox.CircleLayer
               id="spots-ambient-glow"
+              filter={selectedCategoryFilter ? ['==', ['get', 'category'], selectedCategoryFilter] : undefined}
               style={{
                 circleRadius: [
                   'case',
@@ -517,6 +541,7 @@ export default function MapScreen() {
             {/* LAYER 3: The Crisp Anchor Pin (Central structural target dot) */}
             <Mapbox.CircleLayer
               id="spots-anchor"
+              filter={selectedCategoryFilter ? ['==', ['get', 'category'], selectedCategoryFilter] : undefined}
               style={{
                 circleRadius: [
                   'case',
@@ -547,6 +572,66 @@ export default function MapScreen() {
             }}
           />
         </Mapbox.MapView>
+
+        <TouchableOpacity
+          style={[
+            styles.floatingButton,
+            {
+              bottom: buttonBottom + 128,
+              opacity: sheetIndex === 2 ? 0 : 1,
+              backgroundColor: selectedCategoryFilter ? theme.primary : theme.card
+            }
+          ]}
+          onPress={() => setShowFilterModal(true)}
+          activeOpacity={0.7}
+          disabled={sheetIndex === 2}
+        >
+          <MaterialIcons name="filter-list" size={24} color={selectedCategoryFilter ? '#fff' : theme.subtext} />
+        </TouchableOpacity>
+
+        {/* Filter Modal */}
+        <Modal
+          visible={showFilterModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowFilterModal(false)}
+        >
+          <TouchableOpacity 
+            style={{ flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.7)', justifyContent: 'center', alignItems: 'center', padding: 20 }}
+            activeOpacity={1}
+            onPress={() => setShowFilterModal(false)}
+          >
+            <TouchableOpacity 
+              activeOpacity={1}
+              style={{ width: '100%', maxWidth: 420, backgroundColor: theme.card, borderRadius: 22, padding: 24, alignItems: 'center', elevation: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.18, shadowRadius: 20 }}
+            >
+              <Text style={{ fontSize: 20, fontWeight: '700', color: theme.text, marginBottom: 20 }}>Filter by Category</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 10 }}>
+                <TouchableOpacity 
+                  style={{ backgroundColor: selectedCategoryFilter === null ? theme.primary : theme.background, paddingVertical: 10, paddingHorizontal: 20, borderRadius: 20, borderWidth: 1, borderColor: selectedCategoryFilter === null ? theme.primary : theme.border }}
+                  onPress={() => { setSelectedCategoryFilter(null); setShowFilterModal(false); }}
+                >
+                  <Text style={{ color: selectedCategoryFilter === null ? '#fff' : theme.text, fontWeight: '600', fontSize: 15 }}>All</Text>
+                </TouchableOpacity>
+                {ALL_CATEGORIES.map(cat => (
+                  <TouchableOpacity 
+                    key={cat}
+                    style={{ backgroundColor: selectedCategoryFilter === cat ? theme.primary : theme.background, paddingVertical: 10, paddingHorizontal: 20, borderRadius: 20, borderWidth: 1, borderColor: selectedCategoryFilter === cat ? theme.primary : theme.border }}
+                    onPress={() => { setSelectedCategoryFilter(cat); setShowFilterModal(false); }}
+                  >
+                    <Text style={{ color: selectedCategoryFilter === cat ? '#fff' : theme.text, fontWeight: '600', fontSize: 15 }}>{cat}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <TouchableOpacity 
+                style={{ marginTop: 25, paddingVertical: 12, paddingHorizontal: 30, backgroundColor: theme.background, borderRadius: 14, borderWidth: 1, borderColor: theme.border }}
+                onPress={() => setShowFilterModal(false)}
+              >
+                <Text style={{ color: theme.text, fontWeight: '600', fontSize: 15 }}>Close</Text>
+              </TouchableOpacity>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </Modal>
 
         <TouchableOpacity
           style={[
@@ -620,12 +705,32 @@ export default function MapScreen() {
                       </View>
                     </View>
 
-                    <TouchableOpacity
-                      style={styles.checkInButton}
-                      onPress={handleCheckIn}
-                    >
-                      <Text style={styles.buttonText}>Check In</Text>
-                    </TouchableOpacity>
+                    {showVibeSelection ? (
+                      <View style={{ width: '100%', marginTop: 10 }}>
+                        <Text style={[styles.densityLabel, { marginBottom: 10, textAlign: 'center' }]}>What's the vibe right now?</Text>
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 10 }}>
+                          {(VIBE_TAGS_BY_CATEGORY[displaySpot.properties.category] || VIBE_TAGS_BY_CATEGORY['default']).map((tag) => (
+                            <TouchableOpacity
+                              key={tag}
+                              style={{ backgroundColor: theme.primary + '20', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20, borderWidth: 1, borderColor: theme.primary }}
+                              onPress={() => handleCheckIn(tag)}
+                            >
+                              <Text style={{ color: theme.primary, fontWeight: '600' }}>{tag}</Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                        <TouchableOpacity style={{ marginTop: 15, padding: 10 }} onPress={() => setShowVibeSelection(false)}>
+                          <Text style={{ color: theme.subtext, textAlign: 'center', fontWeight: '500' }}>Cancel</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : (
+                      <TouchableOpacity
+                        style={styles.checkInButton}
+                        onPress={() => setShowVibeSelection(true)}
+                      >
+                        <Text style={styles.buttonText}>Check In</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 </>
               );

@@ -38,7 +38,7 @@ public interface CheckInRepository extends JpaRepository<CheckIn, Long> {
 
        List<CheckIn> findAllByOrderByCheckInTimeDesc();
 
-       @Query("SELECT new com.jemturk.revynd.backend.dto.CheckInRecord(c.id, c.spot.name, c.spot.vibe, c.checkInTime, c.intensityAtTime) "
+       @Query("SELECT new com.jemturk.revynd.backend.dto.CheckInRecord(c.id, c.spot.name, c.vibeTag, c.checkInTime, c.intensityAtTime) "
                      +
                      "FROM CheckIn c " +
                      "WHERE c.user.id = :userId " +
