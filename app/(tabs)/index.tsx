@@ -21,6 +21,7 @@ type SpotFeature = Feature<Point, {
   name: string;
   vibe: string;
   intensity: number;
+  isSaved: boolean;
 }>;
 
 export default function MapScreen() {
@@ -40,6 +41,7 @@ export default function MapScreen() {
 
   const [alertConfig, setAlertConfig] = useState<{ msg: string; type: 'error' | 'warning' | 'success' | null }>({ msg: '', type: null });
   const slideAnim = useRef(new Animated.Value(-100)).current; // Start off-screen
+  const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Animated value driving the expanding pulse ripple layer
   const pulseAnim = useRef(new Animated.Value(0)).current;
@@ -255,6 +257,7 @@ export default function MapScreen() {
           name: spot.name,
           vibe: spot.vibe,
           intensity: spot.intensity,
+          isSaved: spot.saved,
         },
         geometry: {
           type: 'Point',
@@ -428,10 +431,19 @@ export default function MapScreen() {
             setSelectedSpot(null);
             bottomSheetRef.current?.snapToIndex(0);
           }}
-          onMapIdle={(e: any) => {
+          onCameraChanged={(e: any) => {
             if (e?.properties?.center) {
               const center = e.properties.center as [number, number];
-              fetchSpots(center);
+              
+              // Clear any existing timeout
+              if (fetchTimeoutRef.current) {
+                clearTimeout(fetchTimeoutRef.current);
+              }
+              
+              // Set a new timeout to debounce the fetch
+              fetchTimeoutRef.current = setTimeout(() => {
+                fetchSpots(center);
+              }, 500);
             }
           }}
         >
@@ -477,6 +489,7 @@ export default function MapScreen() {
                   'case',
                   ['>=', ['get', 'intensity'], 0.8], 52,
                   ['>', ['get', 'intensity'], 0.2], 30,
+                  ['==', ['get', 'isSaved'], false], 0, // No ambient glow for unsaved places
                   14
                 ],
                 circleColor: [
@@ -503,19 +516,26 @@ export default function MapScreen() {
                   'case',
                   ['>=', ['get', 'intensity'], 0.8], 8,
                   ['>', ['get', 'intensity'], 0.2], 6,
+                  ['==', ['get', 'isSaved'], false], 3.5, // Smaller dot for unsaved places
                   4.5
                 ],
-                circleColor: theme.card,
+                circleColor: [
+                  'case',
+                  ['==', ['get', 'isSaved'], false], '#9CA3AF', // Gray center for unsaved
+                  theme.card
+                ],
                 circleStrokeWidth: [
                   'case',
                   ['>=', ['get', 'intensity'], 0.8], 3.5,
                   ['>', ['get', 'intensity'], 0.2], 2.5,
+                  ['==', ['get', 'isSaved'], false], 1.5,
                   2.0
                 ],
                 circleStrokeColor: [
                   'case',
                   ['>=', ['get', 'intensity'], 0.8], '#EC4899',
                   ['>', ['get', 'intensity'], 0.2], '#F97316',
+                  ['==', ['get', 'isSaved'], false], '#6B7280', // Gray stroke for unsaved
                   '#FB923C'
                 ],
                 circleOpacity: 1,
