@@ -263,7 +263,7 @@ export default function MapScreen() {
   const fetchSpots = async (coords?: [number, number]) => {
     try {
       const activeCoords = coords || userCoords || NYC_COORDS;
-      const response = await fetch(`${API_URL}/api/spots/explore?lat=${activeCoords[1]}&lng=${activeCoords[0]}&categories=bar,cafe,coffee,restaurant,tennis,skate,skate_park,skatepark`, {
+      const response = await fetch(`${API_URL}/api/spots/explore?lat=${activeCoords[1]}&lng=${activeCoords[0]}&categories=bar,cafe,coffee,restaurant,tennis_courts,skatepark`, {
         headers: await buildAuthHeaders(),
       });
 
