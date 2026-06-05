@@ -537,7 +537,7 @@ const makeStyles = (theme: AppTheme) => StyleSheet.create({
   },
   modalTitle: { fontSize: 20, fontWeight: '700', color: theme.text, marginBottom: 12 },
   modalMessage: { fontSize: 15, color: theme.subtext, lineHeight: 22, marginBottom: 24 },
-  modalButtons: { flexDirection: 'row', justifyBetween: 'space-between' },
+  modalButtons: { flexDirection: 'row', justifyContent: 'space-between' },
   modalButton: {
     flex: 1,
     paddingVertical: 14,

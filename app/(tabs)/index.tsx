@@ -36,12 +36,26 @@ type SpotFeature = Feature<Point, {
   isSaved: boolean;
 }>;
 
+const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+  const R = 6371e3;
+  const φ1 = lat1 * Math.PI / 180;
+  const φ2 = lat2 * Math.PI / 180;
+  const Δφ = (lat2 - lat1) * Math.PI / 180;
+  const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+  const a =
+    Math.sin(Δφ / 2) ** 2 +
+    Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2;
+
+  return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+};
+
 export default function MapScreen() {
   const { theme, isDark } = useTheme();
 
   const cameraRef = useRef<Mapbox.Camera>(null);
   const bottomSheetRef = useRef<BottomSheet>(null);
-  const snapPoints = useMemo(() => ['14%', '40%', '90%'], []);
+  const snapPoints = useMemo(() => ['14%', '40%', '60%', '90%'], []);
 
   const [selectedSpot, setSelectedSpot] = useState<SpotFeature | null>(null);
   const [userCoords, setUserCoords] = useState<[number, number] | null>(null);
@@ -68,7 +82,7 @@ export default function MapScreen() {
     'Restaurant', '#3B82F6', // Blue
     'Tennis', '#22C55E',     // Green
     '#FB923C'                // Default Revynd Orange
-  ];
+  ] as any;
 
   // Animated value driving the expanding pulse ripple layer
   const pulseAnim = useRef(new Animated.Value(0)).current;
@@ -315,26 +329,43 @@ export default function MapScreen() {
     setShowVibeSelection(false);
   }, [selectedSpot]);
 
-  const handleRefresh = () => {
+  useEffect(() => {
+    if (sheetIndex < 2) {
+      setShowVibeSelection(false);
+    }
+  }, [sheetIndex]);
+
+  useEffect(() => {
+    if (!selectedSpot) return;
+
+    const updatedSpot = featureCollection?.features.find((f) => {
+      if (f.properties.id === selectedSpot.properties.id) return true;
+      const dist = getDistance(
+        f.geometry.coordinates[1], f.geometry.coordinates[0],
+        selectedSpot.geometry.coordinates[1], selectedSpot.geometry.coordinates[0]
+      );
+      return dist < 10;
+    }) as SpotFeature | undefined;
+
+    if (updatedSpot) {
+      if (
+        updatedSpot.properties.id !== selectedSpot.properties.id ||
+        updatedSpot.properties.intensity !== selectedSpot.properties.intensity ||
+        updatedSpot.properties.vibe !== selectedSpot.properties.vibe ||
+        updatedSpot.properties.isSaved !== selectedSpot.properties.isSaved
+      ) {
+        setSelectedSpot(updatedSpot);
+      }
+    }
+  }, [featureCollection, selectedSpot]);
+
+  const handleRefresh = (coords?: any) => {
     setIsRefreshing(true);
-    fetchSpots(userCoords || undefined);
+    const targetCoords = (coords && Array.isArray(coords)) ? coords : (userCoords || undefined);
+    fetchSpots(targetCoords as [number, number] | undefined);
   };
 
   const buttonBottom = sheetIndex === 0 ? 150 : sheetIndex === 1 ? 300 : -150;
-
-  const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    const R = 6371e3;
-    const φ1 = lat1 * Math.PI / 180;
-    const φ2 = lat2 * Math.PI / 180;
-    const Δφ = (lat2 - lat1) * Math.PI / 180;
-    const Δλ = (lon2 - lon1) * Math.PI / 180;
-
-    const a =
-      Math.sin(Δφ / 2) ** 2 +
-      Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2;
-
-    return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
-  };
 
   const handleCheckIn = async (selectedTag: string) => {
     if (!userCoords || !selectedSpot) {
@@ -375,7 +406,7 @@ export default function MapScreen() {
       if (response.ok) {
         triggerAlert(`You're checked in at ${selectedSpot?.properties.name}!`, 'success');
         safeHaptic(Haptics.ImpactFeedbackStyle.Light);
-        handleRefresh();
+        handleRefresh(spotCoords);
       } else if (response.status === 429) {
         triggerAlert("Whoa! Only one check-in per hour at one spot.", 'error');
         safeHaptic(Haptics.ImpactFeedbackStyle.Medium);
@@ -578,13 +609,13 @@ export default function MapScreen() {
             styles.floatingButton,
             {
               bottom: buttonBottom + 128,
-              opacity: sheetIndex === 2 ? 0 : 1,
+              opacity: sheetIndex >= 2 ? 0 : 1,
               backgroundColor: selectedCategoryFilter ? theme.primary : theme.card
             }
           ]}
           onPress={() => setShowFilterModal(true)}
           activeOpacity={0.7}
-          disabled={sheetIndex === 2}
+          disabled={sheetIndex >= 2}
         >
           <MaterialIcons name="filter-list" size={24} color={selectedCategoryFilter ? '#fff' : theme.subtext} />
         </TouchableOpacity>
@@ -636,11 +667,11 @@ export default function MapScreen() {
         <TouchableOpacity
           style={[
             styles.floatingButton,
-            { bottom: buttonBottom, opacity: sheetIndex === 2 ? 0 : 1 }
+            { bottom: buttonBottom, opacity: sheetIndex >= 2 ? 0 : 1 }
           ]}
           onPress={centerOnUser}
           activeOpacity={0.7}
-          disabled={sheetIndex === 2}
+          disabled={sheetIndex >= 2}
         >
           <MaterialIcons name="my-location" size={24} color={theme.subtext} />
         </TouchableOpacity>
@@ -650,12 +681,12 @@ export default function MapScreen() {
             styles.floatingButton,
             {
               bottom: buttonBottom + 64,
-              opacity: sheetIndex === 2 ? 0 : 1,
+              opacity: sheetIndex >= 2 ? 0 : 1,
               backgroundColor: theme.primary
             }
           ]}
           onPress={handleRefresh}
-          disabled={isRefreshing}
+          disabled={isRefreshing || sheetIndex >= 2}
           activeOpacity={0.7}
         >
           {isRefreshing ? (
@@ -675,9 +706,14 @@ export default function MapScreen() {
         >
           <BottomSheetView style={styles.contentContainer}>
             {selectedSpot ? (() => {
-              const liveSpot = featureCollection?.features.find(
-                (f) => f.properties.id === selectedSpot.properties.id
-              );
+              const liveSpot = featureCollection?.features.find((f) => {
+                if (f.properties.id === selectedSpot.properties.id) return true;
+                const dist = getDistance(
+                  f.geometry.coordinates[1], f.geometry.coordinates[0],
+                  selectedSpot.geometry.coordinates[1], selectedSpot.geometry.coordinates[0]
+                );
+                return dist < 10;
+              });
               const displaySpot = liveSpot || selectedSpot;
 
               return (
@@ -719,14 +755,23 @@ export default function MapScreen() {
                             </TouchableOpacity>
                           ))}
                         </View>
-                        <TouchableOpacity style={{ marginTop: 15, padding: 10 }} onPress={() => setShowVibeSelection(false)}>
+                        <TouchableOpacity 
+                          style={{ marginTop: 15, padding: 10 }} 
+                          onPress={() => {
+                            setShowVibeSelection(false);
+                            bottomSheetRef.current?.snapToIndex(1);
+                          }}
+                        >
                           <Text style={{ color: theme.subtext, textAlign: 'center', fontWeight: '500' }}>Cancel</Text>
                         </TouchableOpacity>
                       </View>
                     ) : (
                       <TouchableOpacity
                         style={styles.checkInButton}
-                        onPress={() => setShowVibeSelection(true)}
+                        onPress={() => {
+                          setShowVibeSelection(true);
+                          bottomSheetRef.current?.snapToIndex(2);
+                        }}
                       >
                         <Text style={styles.buttonText}>Check In</Text>
                       </TouchableOpacity>
