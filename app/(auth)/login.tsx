@@ -17,6 +17,11 @@ export default function LoginScreen() {
     const [isPasswordVisible, setIsPasswordVisible] = useState(false);
     const [errorMsg, setErrorMsg] = useState('');
 
+    const [isVerifying, setIsVerifying] = useState(false);
+    const [verificationCode, setVerificationCode] = useState('');
+    const [verifyingEmail, setVerifyingEmail] = useState('');
+    const [successMsg, setSuccessMsg] = useState('');
+
     const validateForm = () => {
         setErrorMsg('');
 
@@ -144,6 +149,15 @@ export default function LoginScreen() {
                 return;
             }
 
+            // If backend returned a non-verified response, transition to verification UI
+            if (data.verified === false) {
+                setVerifyingEmail(data.email || normalizedEmail);
+                setIsVerifying(true);
+                setErrorMsg('');
+                setSuccessMsg(data.message || 'Verification code sent.');
+                return;
+            }
+
             if (data.token) {
                 await SecureStore.setItemAsync('user_token', data.token);
             }
@@ -159,6 +173,174 @@ export default function LoginScreen() {
             console.error('Network Error Details:', error);
         }
     };
+
+    const handleVerifyCode = async () => {
+        setErrorMsg('');
+        setSuccessMsg('');
+        
+        if (!verificationCode.trim()) {
+            setErrorMsg('Please enter the verification code.');
+            return;
+        }
+
+        const BASE_URL = 'https://revynd-api-939729691035.us-east1.run.app';
+
+        try {
+            const response = await fetch(`${BASE_URL}/api/auth/verify`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({
+                    email: verifyingEmail,
+                    code: verificationCode.trim(),
+                }),
+            });
+
+            const rawText = await response.text();
+            let data: any = {};
+            if (rawText) {
+                try {
+                    data = JSON.parse(rawText);
+                } catch {
+                    data = { message: rawText.trim() };
+                }
+            }
+
+            if (!response.ok) {
+                setErrorMsg(data.message || 'Verification failed. Please check the code and try again.');
+                return;
+            }
+
+            if (data.token) {
+                await SecureStore.setItemAsync('user_token', data.token);
+            }
+
+            signIn({
+                name: data.name || 'Rider',
+                email: data.email,
+                profilePicture: data.profilePicture || undefined,
+            });
+
+        } catch (error) {
+            setErrorMsg('Unable to connect to REVYND core systems. Please try again later.');
+            console.error('Verification Error Details:', error);
+        }
+    };
+
+    const handleResendCode = async () => {
+        setErrorMsg('');
+        setSuccessMsg('');
+
+        const BASE_URL = 'https://revynd-api-939729691035.us-east1.run.app';
+
+        try {
+            const response = await fetch(`${BASE_URL}/api/auth/resend-code`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({
+                    email: verifyingEmail,
+                }),
+            });
+
+            const rawText = await response.text();
+            let data: any = {};
+            if (rawText) {
+                try {
+                    data = JSON.parse(rawText);
+                } catch {
+                    data = { message: rawText.trim() };
+                }
+            }
+
+            if (!response.ok) {
+                setErrorMsg(data.message || 'Failed to resend verification code.');
+                return;
+            }
+
+            setSuccessMsg(data.message || 'Verification code resent successfully!');
+        } catch (error) {
+            setErrorMsg('Unable to connect to REVYND core systems. Please try again later.');
+            console.error('Resend Error Details:', error);
+        }
+    };
+
+    if (isVerifying) {
+        return (
+            <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                style={styles.container}
+            >
+                <View style={styles.innerContainer}>
+                    <Text style={styles.logo}>REVYND</Text>
+                    <Text style={styles.subtitle}>
+                        Verify your email address
+                    </Text>
+
+                    <Text style={styles.instructions}>
+                        We sent a 6-digit code to{"\n"}
+                        <Text style={styles.emailHighlight}>{verifyingEmail}</Text>
+                    </Text>
+
+                    {/* Error Warning Banner Layout */}
+                    {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
+
+                    {/* Success Banner Layout */}
+                    {successMsg ? <Text style={styles.successText}>{successMsg}</Text> : null}
+
+                    <TextInput
+                        style={styles.input}
+                        placeholder="6-Digit Code"
+                        placeholderTextColor={theme.subtext}
+                        value={verificationCode}
+                        onChangeText={setVerificationCode}
+                        autoCapitalize="none"
+                        keyboardType="number-pad"
+                        maxLength={6}
+                    />
+
+                    <TouchableOpacity style={styles.mainButton} onPress={handleVerifyCode}>
+                        <Text style={styles.mainButtonText}>
+                            Verify Code
+                        </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={styles.toggleFooter}
+                        onPress={handleResendCode}
+                    >
+                        <Text style={styles.toggleText}>
+                            Didn't receive the code?{" "}
+                            <Text style={styles.blueHighlight}>
+                                Resend Code
+                            </Text>
+                        </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={styles.toggleFooter}
+                        onPress={() => {
+                            setIsVerifying(false);
+                            setErrorMsg('');
+                            setSuccessMsg('');
+                            setVerificationCode('');
+                        }}
+                    >
+                        <Text style={styles.toggleText}>
+                            Go back to{" "}
+                            <Text style={styles.blueHighlight}>
+                                Login / Sign Up
+                            </Text>
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+            </KeyboardAvoidingView>
+        );
+    }
 
     return (
         <KeyboardAvoidingView
@@ -245,6 +427,7 @@ const makeStyles = (theme) => StyleSheet.create({
     logo: { fontSize: 46, fontWeight: '900', color: theme.primary, textAlign: 'center', letterSpacing: 2 },
     subtitle: { textAlign: 'center', marginBottom: 20, fontSize: 15, fontWeight: '500', color: theme.subtext },
     errorText: { color: '#EF4444', backgroundColor: theme.card, padding: 12, borderRadius: 8, marginBottom: 20, textAlign: 'center', fontWeight: '600', fontSize: 14 },
+    successText: { color: '#10B981', backgroundColor: theme.card, padding: 12, borderRadius: 8, marginBottom: 20, textAlign: 'center', fontWeight: '600', fontSize: 14 },
     input: { padding: 16, borderRadius: 12, marginBottom: 8, fontSize: 16, backgroundColor: theme.card, color: theme.text },
     passwordContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.card, borderRadius: 12, paddingHorizontal: 10, marginBottom: 8 },
     passwordInput: { flex: 1, paddingVertical: 16, paddingRight: 8, color: theme.text },
@@ -253,5 +436,7 @@ const makeStyles = (theme) => StyleSheet.create({
     mainButtonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
     toggleFooter: { marginTop: 24, alignItems: 'center' },
     toggleText: { fontSize: 14, fontWeight: '500', color: theme.subtext },
-    blueHighlight: { color: theme.primary, fontWeight: '700' }
+    blueHighlight: { color: theme.primary, fontWeight: '700' },
+    instructions: { textAlign: 'center', marginBottom: 24, fontSize: 16, fontWeight: '500', color: theme.subtext, lineHeight: 22 },
+    emailHighlight: { color: theme.text, fontWeight: '700' }
 });

@@ -47,16 +47,11 @@ public class AuthController {
         // If the email matches an existing entry, this explicitly throws an IllegalArgumentException
         User savedUser = authService.registerNewUser(request);
 
-        // 2. Generate your JWT security token using the validated email
-        String token = generateJwtToken(savedUser.getEmail());
-
-        // 3. Assemble the exact clean payload response your phone app expects
-        Map<String, String> response = new HashMap<>();
-        response.put("id", String.valueOf(savedUser.getId()));
-        response.put("name", savedUser.getName());
+        // 2. Assemble the response indicating verification is required
+        Map<String, Object> response = new HashMap<>();
+        response.put("verified", false);
         response.put("email", savedUser.getEmail());
-        response.put("token", token);
-        response.put("profilePicture", savedUser.getProfilePicture());
+        response.put("message", "Registration successful. A verification code has been sent to your email.");
 
         return ResponseEntity.ok(response);
     }
@@ -74,10 +69,20 @@ public class AuthController {
         // 2. Invoke AuthService to execute the Supabase lookup and BCrypt password evaluation
         User authenticatedUser = authService.authenticateUser(email, rawPassword);
 
-        // 3. Generate a fresh session security token on successful verification match
+        // 3. Verify user has verified their email address
+        if (!authenticatedUser.isVerified()) {
+            authService.generateAndSendVerificationCode(authenticatedUser);
+            Map<String, Object> response = new HashMap<>();
+            response.put("verified", false);
+            response.put("email", authenticatedUser.getEmail());
+            response.put("message", "Your account is not verified. A new verification code has been sent to your email.");
+            return ResponseEntity.ok(response);
+        }
+
+        // 4. Generate a fresh session security token on successful verification match
         String token = generateJwtToken(authenticatedUser.getEmail());
 
-        // 4. Map down the exact success signature your React Native client expects
+        // 5. Map down the exact success signature your React Native client expects
         Map<String, String> response = new HashMap<>();
         response.put("id", String.valueOf(authenticatedUser.getId()));
         response.put("name", authenticatedUser.getName());
@@ -86,6 +91,38 @@ public class AuthController {
         response.put("profilePicture", authenticatedUser.getProfilePicture());
 
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/verify")
+    public ResponseEntity<?> verifyCode(@RequestBody Map<String, String> body) {
+        String email = body.get("email");
+        String code = body.get("code");
+        if (email == null || code == null || email.trim().isEmpty() || code.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Email and verification code are required."));
+        }
+
+        User verifiedUser = authService.verifyEmail(email, code);
+        String token = generateJwtToken(verifiedUser.getEmail());
+
+        Map<String, String> response = new HashMap<>();
+        response.put("id", String.valueOf(verifiedUser.getId()));
+        response.put("name", verifiedUser.getName());
+        response.put("email", verifiedUser.getEmail());
+        response.put("token", token);
+        response.put("profilePicture", verifiedUser.getProfilePicture());
+
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/resend-code")
+    public ResponseEntity<?> resendCode(@RequestBody Map<String, String> body) {
+        String email = body.get("email");
+        if (email == null || email.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Email is required."));
+        }
+
+        authService.resendVerificationCode(email);
+        return ResponseEntity.ok(Map.of("message", "Verification code resent successfully."));
     }
 
     @PutMapping("/profile-picture")

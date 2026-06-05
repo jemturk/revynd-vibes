@@ -32,6 +32,15 @@ public class User {
     @Column(name = "profile_picture", columnDefinition = "TEXT")
     private String profilePicture;
 
+    @Column(nullable = false)
+    private boolean verified = false;
+
+    @Column(name = "verification_code")
+    private String verificationCode;
+
+    @Column(name = "verification_code_expires_at")
+    private java.time.LocalDateTime verificationCodeExpiresAt;
+
     // Constructors
     public User() {}
 
@@ -51,4 +60,11 @@ public class User {
     public void setPassword(String password) { this.password = password; }
     public String getProfilePicture() { return profilePicture; }
     public void setProfilePicture(String profilePicture) { this.profilePicture = profilePicture; }
+
+    public boolean isVerified() { return verified; }
+    public void setVerified(boolean verified) { this.verified = verified; }
+    public String getVerificationCode() { return verificationCode; }
+    public void setVerificationCode(String verificationCode) { this.verificationCode = verificationCode; }
+    public java.time.LocalDateTime getVerificationCodeExpiresAt() { return verificationCodeExpiresAt; }
+    public void setVerificationCodeExpiresAt(java.time.LocalDateTime verificationCodeExpiresAt) { this.verificationCodeExpiresAt = verificationCodeExpiresAt; }
 }

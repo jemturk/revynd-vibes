@@ -24,12 +24,14 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final BCryptPasswordEncoder passwordEncoder;
+    private final EmailService emailService;
 
     private static final Pattern UPPERCASE_PATTERN = Pattern.compile("[A-Z]");
     private static final Pattern SPECIAL_CHAR_PATTERN = Pattern.compile("[!@#$%^&*(),.?\":{}|<>]");
 
-    public AuthService(UserRepository userRepository) {
+    public AuthService(UserRepository userRepository, EmailService emailService) {
         this.userRepository = userRepository;
+        this.emailService = emailService;
         this.passwordEncoder = new BCryptPasswordEncoder();
     }
 
@@ -77,6 +79,9 @@ public class AuthService {
         try {
             logger.info("💾 Saving entity to repository context...");
             User savedUser = userRepository.save(newUser);
+
+            // Generate and send verification code (which will also flush changes)
+            generateAndSendVerificationCode(savedUser);
 
             logger.info("🔊 Forcing immediate database engine synchronization flush...");
             userRepository.flush();
@@ -162,5 +167,67 @@ public class AuthService {
             logger.error("Failed to persist updated profile picture: ", ex);
             throw new RuntimeException("Failed to save updated profile picture: " + ex.getMessage());
         }
+    }
+
+    @Transactional
+    public void generateAndSendVerificationCode(User user) {
+        String code = String.format("%06d", new java.util.Random().nextInt(1000000));
+        user.setVerificationCode(code);
+        user.setVerificationCodeExpiresAt(java.time.LocalDateTime.now().plusMinutes(15));
+        
+        userRepository.save(user);
+        userRepository.flush();
+        entityManager.flush();
+        
+        emailService.sendVerificationCode(user.getEmail(), code);
+    }
+
+    @Transactional
+    public User verifyEmail(String email, String code) {
+        String normalizedEmail = email.trim().toLowerCase();
+        logger.info("Verification code check initiated for email: {}", normalizedEmail);
+
+        User user = userRepository.findByEmail(normalizedEmail)
+                .orElseThrow(() -> new IllegalArgumentException("No account found matching this email address."));
+
+        if (user.isVerified()) {
+            logger.info("User {} is already verified.", normalizedEmail);
+            return user;
+        }
+
+        if (user.getVerificationCode() == null || !user.getVerificationCode().equals(code)) {
+            throw new IllegalArgumentException("Invalid verification code. Please try again.");
+        }
+
+        if (user.getVerificationCodeExpiresAt() == null || 
+            user.getVerificationCodeExpiresAt().isBefore(java.time.LocalDateTime.now())) {
+            throw new IllegalArgumentException("Verification code has expired. Please request a new one.");
+        }
+
+        user.setVerified(true);
+        user.setVerificationCode(null);
+        user.setVerificationCodeExpiresAt(null);
+
+        User savedUser = userRepository.save(user);
+        userRepository.flush();
+        entityManager.flush();
+
+        logger.info("✅ User {} successfully verified.", normalizedEmail);
+        return savedUser;
+    }
+
+    @Transactional
+    public void resendVerificationCode(String email) {
+        String normalizedEmail = email.trim().toLowerCase();
+        logger.info("Resend verification code requested for email: {}", normalizedEmail);
+
+        User user = userRepository.findByEmail(normalizedEmail)
+                .orElseThrow(() -> new IllegalArgumentException("No account found matching this email address."));
+
+        if (user.isVerified()) {
+            throw new IllegalArgumentException("This account is already verified.");
+        }
+
+        generateAndSendVerificationCode(user);
     }
 }
