@@ -421,33 +421,54 @@ export default function MapScreen() {
   };
 
   useEffect(() => {
+    let subscription: Location.LocationSubscription | null = null;
+
     (async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') return;
 
-      const location = await Location.getCurrentPositionAsync({});
-      const coords: [number, number] = [
-        location.coords.longitude,
-        location.coords.latitude,
-      ];
-      setUserCoords(coords);
-      fetchSpots(coords);
-
       try {
+        const location = await Location.getCurrentPositionAsync({});
+        const coords: [number, number] = [
+          location.coords.longitude,
+          location.coords.latitude,
+        ];
+        setUserCoords(coords);
+        fetchSpots(coords);
+
         const reverseCoords = { latitude: coords[1], longitude: coords[0] };
         const address = await Location.reverseGeocodeAsync(reverseCoords);
         if (address.length > 0) {
           setCurrentCity(address[0].city || address[0].subregion);
         }
+
+        cameraRef.current?.setCamera({
+          centerCoordinate: coords,
+          zoomLevel: 14,
+          animationDuration: 1000,
+        });
       } catch (e) {
-        console.error("Reverse geocoding failed", e);
+        console.error("Initial position retrieval failed", e);
       }
 
-      cameraRef.current?.setCamera({
-        centerCoordinate: coords ? coords : NYC_COORDS,
-        zoomLevel: 14,
-        animationDuration: 1000,
-      });
+      try {
+        subscription = await Location.watchPositionAsync(
+          {
+            accuracy: Location.Accuracy.Balanced,
+            timeInterval: 10000, // Update every 10 seconds
+            distanceInterval: 10, // Update every 10 meters
+          },
+          (location) => {
+            const coords: [number, number] = [
+              location.coords.longitude,
+              location.coords.latitude,
+            ];
+            setUserCoords(coords);
+          }
+        );
+      } catch (e) {
+        console.error("Failed to start location watching", e);
+      }
     })();
 
     const loadLastSpot = async () => {
@@ -465,6 +486,12 @@ export default function MapScreen() {
     };
 
     loadLastSpot();
+
+    return () => {
+      if (subscription) {
+        subscription.remove();
+      }
+    };
   }, []);
 
   if (isLoading) {

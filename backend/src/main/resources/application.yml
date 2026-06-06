@@ -34,3 +34,4 @@ spring:
 app:
   mail:
     from: ${MAIL_FROM:onboarding@resend.dev}
+    from-name: ${MAIL_FROM_NAME:REVYND}
