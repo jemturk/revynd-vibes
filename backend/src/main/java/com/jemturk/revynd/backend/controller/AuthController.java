@@ -125,6 +125,32 @@ public class AuthController {
         return ResponseEntity.ok(Map.of("message", "Verification code resent successfully."));
     }
 
+    @PostMapping("/forgot-password")
+    public ResponseEntity<?> forgotPassword(@RequestBody Map<String, String> body) {
+        String email = body.get("email");
+        if (email == null || email.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Email is required."));
+        }
+
+        authService.initiateForgotPassword(email);
+        return ResponseEntity.ok(Map.of("message", "Verification code sent to your email."));
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<?> resetPassword(@RequestBody Map<String, String> body) {
+        String email = body.get("email");
+        String code = body.get("code");
+        String password = body.get("password");
+
+        if (email == null || code == null || password == null || 
+            email.trim().isEmpty() || code.trim().isEmpty() || password.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Email, code, and new password are required."));
+        }
+
+        authService.resetPassword(email, code, password);
+        return ResponseEntity.ok(Map.of("message", "Password reset successfully. You can now log in."));
+    }
+
     @PutMapping("/profile-picture")
     public ResponseEntity<?> updateProfilePicture(@RequestBody Map<String, String> request, Principal principal) {
         if (principal == null) {

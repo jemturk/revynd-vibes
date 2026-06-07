@@ -22,6 +22,11 @@ export default function LoginScreen() {
     const [verifyingEmail, setVerifyingEmail] = useState('');
     const [successMsg, setSuccessMsg] = useState('');
 
+    const [isForgotMode, setIsForgotMode] = useState(false);
+    const [isResetting, setIsResetting] = useState(false);
+    const [resetCode, setResetCode] = useState('');
+    const [newPassword, setNewPassword] = useState('');
+
     const validateForm = () => {
         setErrorMsg('');
 
@@ -269,6 +274,288 @@ export default function LoginScreen() {
         }
     };
 
+    const handleSendResetCode = async () => {
+        setErrorMsg('');
+        setSuccessMsg('');
+
+        if (!email.trim()) {
+            setErrorMsg('Please enter your email address.');
+            return;
+        }
+
+        const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailPattern.test(email.trim())) {
+            setErrorMsg('Please enter a valid email address.');
+            return;
+        }
+
+        const BASE_URL = 'https://revynd-api-939729691035.us-east1.run.app';
+
+        try {
+            const response = await fetch(`${BASE_URL}/api/auth/forgot-password`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({
+                    email: email.trim().toLowerCase(),
+                }),
+            });
+
+            const rawText = await response.text();
+            let data: any = {};
+            if (rawText) {
+                try {
+                    data = JSON.parse(rawText);
+                } catch {
+                    data = { message: rawText.trim() };
+                }
+            }
+
+            if (!response.ok) {
+                setErrorMsg(data.message || 'Failed to send reset code. Please try again.');
+                return;
+            }
+
+            setVerifyingEmail(email.trim().toLowerCase());
+            setIsResetting(true);
+            setSuccessMsg(data.message || 'Verification code sent to your email.');
+
+        } catch (error) {
+            setErrorMsg('Unable to connect to REVYND core systems. Please try again later.');
+            console.error('Forgot Password Error Details:', error);
+        }
+    };
+
+    const handleResetPassword = async () => {
+        setErrorMsg('');
+        setSuccessMsg('');
+
+        if (!resetCode.trim()) {
+            setErrorMsg('Please enter the reset code.');
+            return;
+        }
+
+        if (!newPassword) {
+            setErrorMsg('Please enter a new password.');
+            return;
+        }
+
+        // Password complexity validation (matches client-side constraints on register)
+        const specialCharRegex = /[!@#$%^&*(),.?\":{}|<>]/;
+        const uppercaseRegex = /[A-Z]/;
+
+        if (newPassword.length < 8) {
+            setErrorMsg('Password must be at least 8 characters long.');
+            return;
+        }
+        if (!uppercaseRegex.test(newPassword)) {
+            setErrorMsg('Password must include at least one uppercase letter.');
+            return;
+        }
+        if (!specialCharRegex.test(newPassword)) {
+            setErrorMsg('Password must include at least one special character (such as !@#$%^&*).');
+            return;
+        }
+
+        const BASE_URL = 'https://revynd-api-939729691035.us-east1.run.app';
+
+        try {
+            const response = await fetch(`${BASE_URL}/api/auth/reset-password`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({
+                    email: verifyingEmail,
+                    code: resetCode.trim(),
+                    password: newPassword,
+                }),
+            });
+
+            const rawText = await response.text();
+            let data: any = {};
+            if (rawText) {
+                try {
+                    data = JSON.parse(rawText);
+                } catch {
+                    data = { message: rawText.trim() };
+                }
+            }
+
+            if (!response.ok) {
+                setErrorMsg(data.message || 'Reset failed. Please check the code and try again.');
+                return;
+            }
+
+            // Success: Reset UI states, redirect to Login
+            setIsForgotMode(false);
+            setIsResetting(false);
+            setResetCode('');
+            setNewPassword('');
+            setIsSignUp(false); // Switch to Log In tab
+            setSuccessMsg(data.message || 'Password reset successfully! Please log in.');
+
+        } catch (error) {
+            setErrorMsg('Unable to connect to REVYND core systems. Please try again later.');
+            console.error('Reset Password Error Details:', error);
+        }
+    };
+
+    if (isForgotMode && !isResetting) {
+        return (
+            <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                style={styles.container}
+            >
+                <View style={styles.innerContainer}>
+                    <Text style={styles.logo}>REVYND</Text>
+                    <Text style={styles.subtitle}>
+                        Reset your password
+                    </Text>
+
+                    <Text style={styles.instructions}>
+                        Enter your email address and we'll send you a 6-digit code to reset your password.
+                    </Text>
+
+                    {/* Error Warning Banner Layout */}
+                    {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
+
+                    {/* Success Banner Layout */}
+                    {successMsg ? <Text style={styles.successText}>{successMsg}</Text> : null}
+
+                    <TextInput
+                        style={styles.input}
+                        placeholder="Email Address"
+                        placeholderTextColor={theme.subtext}
+                        value={email}
+                        onChangeText={setEmail}
+                        autoCapitalize="none"
+                        keyboardType="email-address"
+                    />
+
+                    <TouchableOpacity style={styles.mainButton} onPress={handleSendResetCode}>
+                        <Text style={styles.mainButtonText}>
+                            Send Code
+                        </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={styles.toggleFooter}
+                        onPress={() => {
+                            setIsForgotMode(false);
+                            setErrorMsg('');
+                            setSuccessMsg('');
+                        }}
+                    >
+                        <Text style={styles.toggleText}>
+                            Back to{" "}
+                            <Text style={styles.blueHighlight}>
+                                Login
+                            </Text>
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+            </KeyboardAvoidingView>
+        );
+    }
+
+    if (isForgotMode && isResetting) {
+        return (
+            <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                style={styles.container}
+            >
+                <View style={styles.innerContainer}>
+                    <Text style={styles.logo}>REVYND</Text>
+                    <Text style={styles.subtitle}>
+                        Choose a new password
+                    </Text>
+
+                    <Text style={styles.instructions}>
+                        We sent a 6-digit reset code to{"\n"}
+                        <Text style={styles.emailHighlight}>{verifyingEmail}</Text>
+                    </Text>
+
+                    {/* Error Warning Banner Layout */}
+                    {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
+
+                    {/* Success Banner Layout */}
+                    {successMsg ? <Text style={styles.successText}>{successMsg}</Text> : null}
+
+                    <TextInput
+                        style={styles.input}
+                        placeholder="6-Digit Reset Code"
+                        placeholderTextColor={theme.subtext}
+                        value={resetCode}
+                        onChangeText={setResetCode}
+                        autoCapitalize="none"
+                        keyboardType="number-pad"
+                        maxLength={6}
+                    />
+
+                    <View style={styles.passwordContainer}>
+                        <TextInput
+                            style={styles.passwordInput}
+                            placeholder="New Password"
+                            placeholderTextColor={theme.subtext}
+                            secureTextEntry={!isPasswordVisible}
+                            value={newPassword}
+                            onChangeText={setNewPassword}
+                            autoCapitalize="none"
+                        />
+                        <TouchableOpacity onPress={() => setIsPasswordVisible((prev) => !prev)} style={styles.eyeButton}>
+                            <MaterialIcons
+                                name={isPasswordVisible ? 'visibility' : 'visibility-off'}
+                                size={24}
+                                color={theme.subtext}
+                            />
+                        </TouchableOpacity>
+                    </View>
+
+                    <TouchableOpacity style={styles.mainButton} onPress={handleResetPassword}>
+                        <Text style={styles.mainButtonText}>
+                            Reset Password
+                        </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={styles.toggleFooter}
+                        onPress={handleSendResetCode}
+                    >
+                        <Text style={styles.toggleText}>
+                            Didn't receive the code?{" "}
+                            <Text style={styles.blueHighlight}>
+                                Resend Code
+                            </Text>
+                        </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={styles.toggleFooter}
+                        onPress={() => {
+                            setIsResetting(false);
+                            setIsForgotMode(false);
+                            setErrorMsg('');
+                            setSuccessMsg('');
+                            setResetCode('');
+                            setNewPassword('');
+                        }}
+                    >
+                        <Text style={styles.toggleText}>
+                            Back to{" "}
+                            <Text style={styles.blueHighlight}>
+                                Login
+                            </Text>
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+            </KeyboardAvoidingView>
+        );
+    }
+
     if (isVerifying) {
         return (
             <KeyboardAvoidingView
@@ -396,6 +683,19 @@ export default function LoginScreen() {
                     </TouchableOpacity>
                 </View>
 
+                {!isSignUp && (
+                    <TouchableOpacity
+                        style={styles.forgotPasswordLink}
+                        onPress={() => {
+                            setIsForgotMode(true);
+                            setErrorMsg('');
+                            setSuccessMsg('');
+                        }}
+                    >
+                        <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+                    </TouchableOpacity>
+                )}
+
                 <TouchableOpacity style={styles.mainButton} onPress={handleAuthAction}>
                     <Text style={styles.mainButtonText}>
                         {isSignUp ? "Create Account" : "Sign In"}
@@ -438,5 +738,7 @@ const makeStyles = (theme) => StyleSheet.create({
     toggleText: { fontSize: 14, fontWeight: '500', color: theme.subtext },
     blueHighlight: { color: theme.primary, fontWeight: '700' },
     instructions: { textAlign: 'center', marginBottom: 24, fontSize: 16, fontWeight: '500', color: theme.subtext, lineHeight: 22 },
-    emailHighlight: { color: theme.text, fontWeight: '700' }
+    emailHighlight: { color: theme.text, fontWeight: '700' },
+    forgotPasswordLink: { alignSelf: 'flex-end', marginTop: 4, marginBottom: 12, paddingVertical: 4 },
+    forgotPasswordText: { fontSize: 13, fontWeight: '600', color: theme.primary }
 });

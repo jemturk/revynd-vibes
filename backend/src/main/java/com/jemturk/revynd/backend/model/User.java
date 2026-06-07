@@ -41,6 +41,12 @@ public class User {
     @Column(name = "verification_code_expires_at")
     private java.time.LocalDateTime verificationCodeExpiresAt;
 
+    @Column(name = "reset_password_code")
+    private String resetPasswordCode;
+
+    @Column(name = "reset_password_code_expires_at")
+    private java.time.LocalDateTime resetPasswordCodeExpiresAt;
+
     // Constructors
     public User() {}
 
@@ -67,4 +73,9 @@ public class User {
     public void setVerificationCode(String verificationCode) { this.verificationCode = verificationCode; }
     public java.time.LocalDateTime getVerificationCodeExpiresAt() { return verificationCodeExpiresAt; }
     public void setVerificationCodeExpiresAt(java.time.LocalDateTime verificationCodeExpiresAt) { this.verificationCodeExpiresAt = verificationCodeExpiresAt; }
+
+    public String getResetPasswordCode() { return resetPasswordCode; }
+    public void setResetPasswordCode(String resetPasswordCode) { this.resetPasswordCode = resetPasswordCode; }
+    public java.time.LocalDateTime getResetPasswordCodeExpiresAt() { return resetPasswordCodeExpiresAt; }
+    public void setResetPasswordCodeExpiresAt(java.time.LocalDateTime resetPasswordCodeExpiresAt) { this.resetPasswordCodeExpiresAt = resetPasswordCodeExpiresAt; }
 }

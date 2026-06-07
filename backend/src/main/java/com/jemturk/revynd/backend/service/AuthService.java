@@ -230,4 +230,69 @@ public class AuthService {
 
         generateAndSendVerificationCode(user);
     }
+
+    @Transactional
+    public void initiateForgotPassword(String email) {
+        String normalizedEmail = email.trim().toLowerCase();
+        logger.info("⚡ Password reset sequence initiated for email: {}", normalizedEmail);
+
+        User user = userRepository.findByEmail(normalizedEmail)
+                .orElseThrow(() -> new IllegalArgumentException("No account found matching this email address."));
+
+        String code = String.format("%06d", new java.util.Random().nextInt(1000000));
+        user.setResetPasswordCode(code);
+        user.setResetPasswordCodeExpiresAt(java.time.LocalDateTime.now().plusMinutes(15));
+
+        userRepository.save(user);
+        userRepository.flush();
+        entityManager.flush();
+
+        emailService.sendPasswordResetCode(user.getEmail(), code);
+        logger.info("✅ Password reset code generated and sent to {}", normalizedEmail);
+    }
+
+    @Transactional
+    public void resetPassword(String email, String code, String newPassword) {
+        String normalizedEmail = email.trim().toLowerCase();
+        logger.info("⚡ Password reset authorization check for email: {}", normalizedEmail);
+
+        User user = userRepository.findByEmail(normalizedEmail)
+                .orElseThrow(() -> new IllegalArgumentException("No account found matching this email address."));
+
+        if (user.getResetPasswordCode() == null || !user.getResetPasswordCode().equals(code)) {
+            throw new IllegalArgumentException("Invalid verification code. Please try again.");
+        }
+
+        if (user.getResetPasswordCodeExpiresAt() == null || 
+            user.getResetPasswordCodeExpiresAt().isBefore(java.time.LocalDateTime.now())) {
+            throw new IllegalArgumentException("Verification code has expired. Please request a new one.");
+        }
+
+        // Validate password complexity constraints (must match registration rules)
+        if (newPassword == null || newPassword.length() < 8) {
+            throw new IllegalArgumentException("Password must be at least 8 characters long.");
+        }
+        if (!UPPERCASE_PATTERN.matcher(newPassword).find()) {
+            throw new IllegalArgumentException("Password requires at least one uppercase letter.");
+        }
+        if (!SPECIAL_CHAR_PATTERN.matcher(newPassword).find()) {
+            throw new IllegalArgumentException("Password requires at least one special character.");
+        }
+
+        String securePasswordHash = passwordEncoder.encode(newPassword);
+        user.setPassword(securePasswordHash);
+        
+        // Mark as verified since they verified they own the email address via the code
+        user.setVerified(true);
+        
+        // Clear reset tokens
+        user.setResetPasswordCode(null);
+        user.setResetPasswordCodeExpiresAt(null);
+
+        userRepository.save(user);
+        userRepository.flush();
+        entityManager.flush();
+
+        logger.info("✅ Password successfully reset and account verified for user ID: {}", user.getId());
+    }
 }
