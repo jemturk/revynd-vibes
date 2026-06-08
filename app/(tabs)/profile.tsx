@@ -213,6 +213,7 @@ export default function AccountScreen() {
 
       await SecureStore.deleteItemAsync('userId');
       await SecureStore.deleteItemAsync('user_token');
+      await SecureStore.setItemAsync('account_deleted_banner', 'true');
       signOut();
     } catch (error) {
       console.error('Delete account failed', error);

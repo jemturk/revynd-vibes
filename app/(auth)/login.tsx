@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, Animated } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useAuth } from '../_layout';
@@ -48,6 +48,21 @@ export default function LoginScreen() {
             }).start(() => setAlertConfig({ msg: '', type: null }));
         }, 3500);
     };
+
+    useEffect(() => {
+        const checkDeletedBanner = async () => {
+            try {
+                const isDeleted = await SecureStore.getItemAsync('account_deleted_banner');
+                if (isDeleted === 'true') {
+                    await SecureStore.deleteItemAsync('account_deleted_banner');
+                    triggerAlert('Account successfully deleted.', 'success');
+                }
+            } catch (error) {
+                console.error('Error checking deleted banner:', error);
+            }
+        };
+        checkDeletedBanner();
+    }, []);
 
     const validateForm = () => {
         setErrorMsg('');
