@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import React, { useState, useRef } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, Animated } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useAuth } from '../_layout';
 import { useTheme } from '../../theme/ThemeContext';
@@ -26,6 +26,28 @@ export default function LoginScreen() {
     const [isResetting, setIsResetting] = useState(false);
     const [resetCode, setResetCode] = useState('');
     const [newPassword, setNewPassword] = useState('');
+
+    const [alertConfig, setAlertConfig] = useState<{ msg: string; type: 'error' | 'warning' | 'success' | null }>({ msg: '', type: null });
+    const slideAnim = useRef(new Animated.Value(-150)).current; // Start off-screen
+
+    const triggerAlert = (msg: string, type: 'error' | 'warning' | 'success') => {
+        setAlertConfig({ msg, type });
+
+        Animated.spring(slideAnim, {
+            toValue: Platform.OS === 'ios' ? 60 : 40,
+            useNativeDriver: true,
+            tension: 50,
+            friction: 8,
+        }).start();
+
+        setTimeout(() => {
+            Animated.timing(slideAnim, {
+                toValue: -150,
+                duration: 500,
+                useNativeDriver: true,
+            }).start(() => setAlertConfig({ msg: '', type: null }));
+        }, 3500);
+    };
 
     const validateForm = () => {
         setErrorMsg('');
@@ -396,7 +418,7 @@ export default function LoginScreen() {
             setResetCode('');
             setNewPassword('');
             setIsSignUp(false); // Switch to Log In tab
-            setSuccessMsg(data.message || 'Password reset successfully! Please log in.');
+            triggerAlert(data.message || 'Password reset successfully! Please log in.', 'success');
 
         } catch (error) {
             setErrorMsg('Unable to connect to REVYND core systems. Please try again later.');
@@ -458,6 +480,25 @@ export default function LoginScreen() {
                         </Text>
                     </TouchableOpacity>
                 </View>
+                <Animated.View style={[
+                    styles.customAlert,
+                    {
+                        transform: [{ translateY: slideAnim }],
+                        backgroundColor:
+                            alertConfig.type === 'success' ? '#10B981' :
+                                alertConfig.type === 'error' ? '#EF4444' :
+                                    '#F59E0B'
+                    }
+                ]}>
+                    <MaterialIcons
+                        name={alertConfig.type === 'success' ? "check-circle" :
+                            alertConfig.type === 'error' ? "block" :
+                                "warning"}
+                        size={20}
+                        color="white"
+                    />
+                    <Text style={styles.alertText}>{alertConfig.msg}</Text>
+                </Animated.View>
             </KeyboardAvoidingView>
         );
     }
@@ -552,6 +593,25 @@ export default function LoginScreen() {
                         </Text>
                     </TouchableOpacity>
                 </View>
+                <Animated.View style={[
+                    styles.customAlert,
+                    {
+                        transform: [{ translateY: slideAnim }],
+                        backgroundColor:
+                            alertConfig.type === 'success' ? '#10B981' :
+                                alertConfig.type === 'error' ? '#EF4444' :
+                                    '#F59E0B'
+                    }
+                ]}>
+                    <MaterialIcons
+                        name={alertConfig.type === 'success' ? "check-circle" :
+                            alertConfig.type === 'error' ? "block" :
+                                "warning"}
+                        size={20}
+                        color="white"
+                    />
+                    <Text style={styles.alertText}>{alertConfig.msg}</Text>
+                </Animated.View>
             </KeyboardAvoidingView>
         );
     }
@@ -625,6 +685,25 @@ export default function LoginScreen() {
                         </Text>
                     </TouchableOpacity>
                 </View>
+                <Animated.View style={[
+                    styles.customAlert,
+                    {
+                        transform: [{ translateY: slideAnim }],
+                        backgroundColor:
+                            alertConfig.type === 'success' ? '#10B981' :
+                                alertConfig.type === 'error' ? '#EF4444' :
+                                    '#F59E0B'
+                    }
+                ]}>
+                    <MaterialIcons
+                        name={alertConfig.type === 'success' ? "check-circle" :
+                            alertConfig.type === 'error' ? "block" :
+                                "warning"}
+                        size={20}
+                        color="white"
+                    />
+                    <Text style={styles.alertText}>{alertConfig.msg}</Text>
+                </Animated.View>
             </KeyboardAvoidingView>
         );
     }
@@ -717,6 +796,25 @@ export default function LoginScreen() {
                     </Text>
                 </TouchableOpacity>
             </View>
+            <Animated.View style={[
+                styles.customAlert,
+                {
+                    transform: [{ translateY: slideAnim }],
+                    backgroundColor:
+                        alertConfig.type === 'success' ? '#10B981' :
+                            alertConfig.type === 'error' ? '#EF4444' :
+                                '#F59E0B'
+                }
+            ]}>
+                <MaterialIcons
+                    name={alertConfig.type === 'success' ? "check-circle" :
+                        alertConfig.type === 'error' ? "block" :
+                            "warning"}
+                    size={20}
+                    color="white"
+                />
+                <Text style={styles.alertText}>{alertConfig.msg}</Text>
+            </Animated.View>
         </KeyboardAvoidingView>
     );
 }
@@ -740,5 +838,25 @@ const makeStyles = (theme) => StyleSheet.create({
     instructions: { textAlign: 'center', marginBottom: 24, fontSize: 16, fontWeight: '500', color: theme.subtext, lineHeight: 22 },
     emailHighlight: { color: theme.text, fontWeight: '700' },
     forgotPasswordLink: { alignSelf: 'flex-end', marginTop: 4, marginBottom: 12, paddingVertical: 4 },
-    forgotPasswordText: { fontSize: 13, fontWeight: '600', color: theme.primary }
+    forgotPasswordText: { fontSize: 13, fontWeight: '600', color: theme.primary },
+    customAlert: {
+        position: 'absolute',
+        left: 20,
+        right: 20,
+        padding: 16,
+        borderRadius: 12,
+        flexDirection: 'row',
+        alignItems: 'center',
+        elevation: 5,
+        shadowColor: theme.text,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        zIndex: 1000,
+    },
+    alertText: {
+        color: 'white',
+        fontWeight: '600',
+        marginLeft: 10,
+        fontSize: 14,
+    }
 });
