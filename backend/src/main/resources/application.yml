@@ -33,5 +33,5 @@ spring:
 
 app:
   mail:
-    from: ${MAIL_FROM:onboarding@resend.dev}
+    from: ${MAIL_FROM:revynd@revynd.com}
     from-name: ${MAIL_FROM_NAME:REVYND}
