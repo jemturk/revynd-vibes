@@ -26,7 +26,7 @@ export default function withMapboxStrings(config) {
       await fs.mkdir(valuesDir, { recursive: true });
 
       const publicToken = process.env.MAPBOX_PUBLIC_TOKEN;
-      const downloadToken = process.env.MAPBOX_DOWNLOAD_TOKEN;
+      const downloadToken = process.env.MAPBOX_DOWNLOAD_TOKEN || process.env.MAPBOX_DOWNLOADS_TOKEN;
       if (!publicToken) {
         throw new Error(
           'Missing MAPBOX_PUBLIC_TOKEN. Set this environment variable before running Expo prebuild or EAS build so the Android native Mapbox access token resource can be generated.'

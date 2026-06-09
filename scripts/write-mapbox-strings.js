@@ -3,7 +3,7 @@ const path = require('path');
 require('dotenv').config();
 
 const publicToken = process.env.MAPBOX_PUBLIC_TOKEN || '';
-const downloadToken = process.env.MAPBOX_DOWNLOAD_TOKEN || '';
+const downloadToken = process.env.MAPBOX_DOWNLOAD_TOKEN || process.env.MAPBOX_DOWNLOADS_TOKEN || '';
 
 function xmlEscape(s) {
   return s

@@ -16,6 +16,10 @@
         "NPM_CONFIG_LEGACY_PEER_DEPS": "true" // Forces the cloud runner to bypass peer checking
       }
     },
-    "production": {}
+    "production": {
+      "env": {
+        "NPM_CONFIG_LEGACY_PEER_DEPS": "true"
+      }
+    }
   }
 }

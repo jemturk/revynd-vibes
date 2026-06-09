@@ -22,6 +22,7 @@ export default {
     },
     "android": {
       "package": "com.jemturk.revynd", // 👈 Consolidated your unique branding package name here
+      "versionCode": 1,                // 👈 Added version code for Google Play release tracking
       "kotlinVersion": "1.9.24",       // 👈 Brought your custom kotlin engine target inside the bundle
       "edgeToEdgeEnabled": false,
       "adaptiveIcon": {
@@ -50,7 +51,7 @@ export default {
       [
         "@rnmapbox/maps",
         {
-          "RNMapboxMapsDownloadToken": process.env.MAPBOX_DOWNLOAD_TOKEN
+          "RNMapboxMapsDownloadToken": process.env.MAPBOX_DOWNLOAD_TOKEN || process.env.MAPBOX_DOWNLOADS_TOKEN
         }
       ],
       [
