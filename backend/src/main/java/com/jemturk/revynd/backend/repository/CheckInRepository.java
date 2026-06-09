@@ -3,6 +3,7 @@ package com.jemturk.revynd.backend.repository;
 import java.time.LocalDateTime;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -50,4 +51,8 @@ public interface CheckInRepository extends JpaRepository<CheckIn, Long> {
         * Used by IntensityDecayService to identify spots that need intensity decay.
         */
        List<CheckIn> findByCheckInTimeAfter(LocalDateTime time);
+
+       @Modifying
+       @Query("DELETE FROM CheckIn c WHERE c.user.id = :userId")
+       void deleteByUserId(@Param("userId") Long userId);
 }

@@ -2,6 +2,7 @@ package com.jemturk.revynd.backend.service;
 
 import com.jemturk.revynd.backend.dto.RegisterRequest;
 import com.jemturk.revynd.backend.model.User;
+import com.jemturk.revynd.backend.repository.CheckInRepository;
 import com.jemturk.revynd.backend.repository.UserRepository;
 
 import jakarta.persistence.EntityManager;
@@ -23,14 +24,16 @@ public class AuthService {
     private static final Logger logger = LoggerFactory.getLogger(AuthService.class);
 
     private final UserRepository userRepository;
+    private final CheckInRepository checkInRepository;
     private final BCryptPasswordEncoder passwordEncoder;
     private final EmailService emailService;
 
     private static final Pattern UPPERCASE_PATTERN = Pattern.compile("[A-Z]");
     private static final Pattern SPECIAL_CHAR_PATTERN = Pattern.compile("[!@#$%^&*(),.?\":{}|<>]");
 
-    public AuthService(UserRepository userRepository, EmailService emailService) {
+    public AuthService(UserRepository userRepository, CheckInRepository checkInRepository, EmailService emailService) {
         this.userRepository = userRepository;
+        this.checkInRepository = checkInRepository;
         this.emailService = emailService;
         this.passwordEncoder = new BCryptPasswordEncoder();
     }
@@ -133,12 +136,13 @@ public class AuthService {
         logger.info("🗑️ Deletion request for user: {}", normalized);
 
         try {
-            if (!userRepository.existsByEmail(normalized)) {
-                logger.warn("Deletion requested for non-existent email: {}", normalized);
-                throw new IllegalArgumentException("No account found for the provided email address.");
-            }
+            User user = userRepository.findByEmail(normalized)
+                    .orElseThrow(() -> new IllegalArgumentException("No account found for the provided email address."));
 
-            userRepository.deleteByEmail(normalized);
+            logger.info("🗑️ Deleting check-ins for user ID: {}", user.getId());
+            checkInRepository.deleteByUserId(user.getId());
+
+            userRepository.delete(user);
             // Ensure flush to propagate immediately
             userRepository.flush();
             entityManager.flush();
