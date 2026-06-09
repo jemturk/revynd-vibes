@@ -34,7 +34,7 @@ export default function LoginScreen() {
         setAlertConfig({ msg, type });
 
         Animated.spring(slideAnim, {
-            toValue: Platform.OS === 'ios' ? 60 : 40,
+            toValue: Platform.OS === 'ios' ? 85 : 65,
             useNativeDriver: true,
             tension: 50,
             friction: 8,
@@ -55,7 +55,7 @@ export default function LoginScreen() {
                 const isDeleted = await SecureStore.getItemAsync('account_deleted_banner');
                 if (isDeleted === 'true') {
                     await SecureStore.deleteItemAsync('account_deleted_banner');
-                    triggerAlert('Account successfully deleted.', 'success');
+                    triggerAlert("Your account has been successfully deleted. We're sorry to see you go and welcome you back anytime!", 'success');
                 }
             } catch (error) {
                 console.error('Error checking deleted banner:', error);
@@ -873,5 +873,6 @@ const makeStyles = (theme) => StyleSheet.create({
         fontWeight: '600',
         marginLeft: 10,
         fontSize: 14,
+        flex: 1,
     }
 });
