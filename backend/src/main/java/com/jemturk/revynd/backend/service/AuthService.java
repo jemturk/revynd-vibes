@@ -183,7 +183,7 @@ public class AuthService {
         userRepository.flush();
         entityManager.flush();
         
-        emailService.sendVerificationCode(user.getEmail(), code);
+        emailService.sendVerificationCode(user.getEmail(), user.getName(), code);
     }
 
     @Transactional
@@ -251,7 +251,7 @@ public class AuthService {
         userRepository.flush();
         entityManager.flush();
 
-        emailService.sendPasswordResetCode(user.getEmail(), code);
+        emailService.sendPasswordResetCode(user.getEmail(), user.getName(), code);
         logger.info("✅ Password reset code generated and sent to {}", normalizedEmail);
     }
 

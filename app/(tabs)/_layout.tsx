@@ -1,9 +1,12 @@
 import { Tabs } from 'expo-router';
 import { useTheme, AppTheme } from '../../theme/ThemeContext';
 import { MaterialIcons } from '@expo/vector-icons';
+import { Image } from 'react-native';
+import { useAuth } from '../_layout';
 
 export default function TabLayout() {
   const { theme } = useTheme();
+  const { user } = useAuth();
 
   return (
     <Tabs
@@ -52,7 +55,24 @@ export default function TabLayout() {
         name="profile"
         options={{
           title: 'Account',
-          tabBarIcon: ({ color }) => <MaterialIcons name="person" size={26} color={color} />,
+          ...(user?.profilePicture ? {
+            tabBarLabel: () => null,
+            tabBarIcon: ({ focused }) => (
+              <Image
+                source={{ uri: user.profilePicture }}
+                style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: 19,
+                  borderWidth: focused ? 2 : 1,
+                  borderColor: focused ? '#FB923C' : theme.border,
+                  marginTop: 6,
+                }}
+              />
+            ),
+          } : {
+            tabBarIcon: ({ color }) => <MaterialIcons name="person" size={26} color={color} />,
+          })
         }}
       />
     </Tabs>
