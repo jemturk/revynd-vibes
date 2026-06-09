@@ -41,7 +41,7 @@ public class EmailService {
                 helper.setSubject("Verify your REVYND account");
 
                 String textContent = "Welcome to REVYND, " + userName
-                        + "!\n\nUse the verification code below to verify your email and complete your account creation.\n\n"
+                        + "!\n\nUse the 6-digit verification code below to verify your email address and complete your registration.\n\n"
                         + code + "\n\nThis code will expire in 15 minutes.";
 
                 String htmlContent = "<div style=\"background-color: #0B0F19; padding: 40px 10px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; text-align: center; color: #F3F4F6;\">"
