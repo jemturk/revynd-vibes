@@ -316,27 +316,27 @@ export default function AccountScreen() {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Account</Text>
-        <AccountItem 
-          icon="person-outline" 
-          label="Edit Profile" 
-          styles={styles} 
+        <AccountItem
+          icon="person-outline"
+          label="Edit Profile"
+          styles={styles}
           onPress={() => {
             setEditName(user?.name || '');
             setEditErrorMessage(null);
             setShowEditModal(true);
-          }} 
+          }}
         />
-        <AccountItem 
-          icon="security" 
-          label="Privacy Policy" 
-          styles={styles} 
+        <AccountItem
+          icon="security"
+          label="Privacy Policy"
+          styles={styles}
           onPress={() => {
             Linking.openURL('https://revynd-api-939729691035.us-east1.run.app/privacy-policy.html')
               .catch(err => {
                 console.error('Failed to open privacy policy URL:', err);
                 Alert.alert('Error', 'Unable to open privacy policy webpage.');
               });
-          }} 
+          }}
         />
         <AccountItem icon="exit-to-app" label="Sign Out" styles={styles} onPress={handleSignOut} color="#fb923c" />
         <AccountItem icon="delete" label="Delete Account" styles={styles} onPress={handleDeleteAccount} destructive />
