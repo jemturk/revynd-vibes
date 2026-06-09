@@ -20,6 +20,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").permitAll() // Login/Register stay public
                         .requestMatchers("/api/spots/**").permitAll() // 🗺️ Allow public spot exploration!
                         .requestMatchers("/api/checkins/**").authenticated() // 🔒 Locked back down!
+                        .requestMatchers("/icon.png").permitAll() // Allow public logo retrieval
                         .anyRequest().authenticated())
                 // Inject our custom token validator into the standard security filter pipeline
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
