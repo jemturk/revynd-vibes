@@ -118,7 +118,11 @@ export default function MapScreen() {
 
   const centerOnUser = () => {
     if (userCoords && cameraRef.current) {
-      cameraRef.current.flyTo(userCoords, 1000); // 1-second smooth glide
+      cameraRef.current.setCamera({
+        centerCoordinate: userCoords,
+        zoomLevel: 14,
+        animationDuration: 1000,
+      });
     } else {
       Alert.alert("Location not found", "Still waiting for GPS lock...");
     }
@@ -868,7 +872,11 @@ export default function MapScreen() {
                       <TouchableOpacity
                         style={[
                           styles.checkInButton,
-                          cooldownRemaining > 0 && { backgroundColor: theme.border }
+                          cooldownRemaining > 0 && { 
+                            backgroundColor: isDark ? 'rgba(13, 148, 136, 0.15)' : 'rgba(13, 148, 136, 0.12)',
+                            elevation: 0,
+                            shadowOpacity: 0
+                          }
                         ]}
                         disabled={cooldownRemaining > 0}
                         onPress={() => {
@@ -876,7 +884,10 @@ export default function MapScreen() {
                           bottomSheetRef.current?.snapToIndex(2);
                         }}
                       >
-                        <Text style={[styles.buttonText, cooldownRemaining > 0 && { color: theme.subtext }]}>
+                        <Text style={[
+                          styles.buttonText, 
+                          cooldownRemaining > 0 && { color: isDark ? 'rgba(45, 212, 191, 0.6)' : 'rgba(13, 148, 136, 0.6)' }
+                        ]}>
                           {cooldownRemaining > 0 ? `Vibe Boosted (${cooldownRemaining}s)` : 'Check In'}
                         </Text>
                       </TouchableOpacity>

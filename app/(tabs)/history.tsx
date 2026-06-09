@@ -222,7 +222,10 @@ const HistoryScreen = () => {
   );
 
   const renderItem = ({ item }: { item: CheckInRecord }) => {
-    const date = new Date(item.checkInTime);
+    // Append 'Z' to treat the timezone-naive ISO string from the backend as UTC,
+    // so that the client parses it as UTC and displays it in the user's local timezone.
+    const timeStr = item.checkInTime && !item.checkInTime.endsWith('Z') ? `${item.checkInTime}Z` : item.checkInTime;
+    const date = new Date(timeStr);
     const percentage = Number(item.intensityAtTime) * 100;
 
     return (
