@@ -72,6 +72,9 @@ export default function MapScreen() {
   const slideAnim = useRef(new Animated.Value(-100)).current; // Start off-screen
   const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  const [lastCheckIns, setLastCheckIns] = useState<Record<string, number>>({});
+  const [cooldownRemaining, setCooldownRemaining] = useState<number>(0);
+
   // Category Color Palette Mapbox Expression
   const categoryColorMatch = [
     'match',
@@ -323,7 +326,53 @@ export default function MapScreen() {
   useEffect(() => {
     AsyncStorage.setItem('last_viewed_spot', '');
     fetchSpots();
+
+    const loadCheckIns = async () => {
+      try {
+        const stored = await AsyncStorage.getItem('last_checkins_by_spot');
+        if (stored) {
+          setLastCheckIns(JSON.parse(stored));
+        }
+      } catch (error) {
+        console.error('Failed to load check-ins history:', error);
+      }
+    };
+    loadCheckIns();
   }, []);
+
+  useEffect(() => {
+    if (!selectedSpot) {
+      setCooldownRemaining(0);
+      return;
+    }
+
+    const spotId = selectedSpot.properties.id;
+    const lastCheckInTime = lastCheckIns[spotId];
+
+    if (!lastCheckInTime) {
+      setCooldownRemaining(0);
+      return;
+    }
+
+    const updateCooldown = () => {
+      const elapsed = Date.now() - lastCheckInTime;
+      const remaining = Math.max(0, Math.ceil((60000 - elapsed) / 1000));
+      setCooldownRemaining(remaining);
+      return remaining;
+    };
+
+    const remaining = updateCooldown();
+    if (remaining <= 0) return;
+
+    const interval = setInterval(() => {
+      const rem = updateCooldown();
+      if (rem <= 0) {
+        clearInterval(interval);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [selectedSpot, lastCheckIns]);
 
   useEffect(() => {
     setShowVibeSelection(false);
@@ -406,10 +455,33 @@ export default function MapScreen() {
       if (response.ok) {
         triggerAlert(`You're checked in at ${selectedSpot?.properties.name}!`, 'success');
         safeHaptic(Haptics.ImpactFeedbackStyle.Light);
+
+        const newCheckIns = {
+          ...lastCheckIns,
+          [spotId]: Date.now()
+        };
+        setLastCheckIns(newCheckIns);
+        try {
+          await AsyncStorage.setItem('last_checkins_by_spot', JSON.stringify(newCheckIns));
+        } catch (error) {
+          console.error('Failed to save check-in timestamp:', error);
+        }
+
         handleRefresh(spotCoords);
       } else if (response.status === 429) {
         triggerAlert("Whoa! Only one check-in per hour at one spot.", 'error');
         safeHaptic(Haptics.ImpactFeedbackStyle.Medium);
+
+        const newCheckIns = {
+          ...lastCheckIns,
+          [spotId]: Date.now()
+        };
+        setLastCheckIns(newCheckIns);
+        try {
+          await AsyncStorage.setItem('last_checkins_by_spot', JSON.stringify(newCheckIns));
+        } catch (error) {
+          console.error('Failed to save check-in timestamp:', error);
+        }
       } else {
         Alert.alert("Error", "Something went wrong on the server.");
       }
@@ -794,13 +866,19 @@ export default function MapScreen() {
                       </View>
                     ) : (
                       <TouchableOpacity
-                        style={styles.checkInButton}
+                        style={[
+                          styles.checkInButton,
+                          cooldownRemaining > 0 && { backgroundColor: theme.border }
+                        ]}
+                        disabled={cooldownRemaining > 0}
                         onPress={() => {
                           setShowVibeSelection(true);
                           bottomSheetRef.current?.snapToIndex(2);
                         }}
                       >
-                        <Text style={styles.buttonText}>Check In</Text>
+                        <Text style={[styles.buttonText, cooldownRemaining > 0 && { color: theme.subtext }]}>
+                          {cooldownRemaining > 0 ? `Vibe Boosted (${cooldownRemaining}s)` : 'Check In'}
+                        </Text>
                       </TouchableOpacity>
                     )}
                   </View>

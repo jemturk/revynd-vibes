@@ -60,14 +60,15 @@ public class CheckInController {
 
         if (lastCheckIn != null) {
             // LocalDateTime limit = LocalDateTime.now().minusHours(1);
-            LocalDateTime limit = LocalDateTime.now().minusSeconds(1);
+            LocalDateTime limit = LocalDateTime.now().minusSeconds(60);
             if (lastCheckIn.getCheckInTime().isAfter(limit)) {
                 return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                         .body("Slow down! You can only boost the vibe once per hour.");
             }
         }
 
-        // Calculate actual intensity based on recent check-ins in the database (including this new one)
+        // Calculate actual intensity based on recent check-ins in the database
+        // (including this new one)
         LocalDateTime oneHourAgo = LocalDateTime.now().minusHours(1);
         List<CheckIn> recentCheckIns = checkInRepository.findBySpotIdAndCheckInTimeAfter(spotId, oneHourAgo);
         long count = recentCheckIns.size() + 1; // recent check-ins + this new one
@@ -127,14 +128,15 @@ public class CheckInController {
         Spot spot;
         if (request.getId().startsWith("transient-")) {
             double[] coords = request.getLocation();
-            
-            // Prevent duplicate creation due to concurrency or rapid taps: check if spot exists within 100m
+
+            // Prevent duplicate creation due to concurrency or rapid taps: check if spot
+            // exists within 100m
             List<Spot> nearbyMatches = spotRepository.findNearby(coords[1], coords[0], 100.0);
             Spot existingSpot = nearbyMatches.stream()
                     .filter(s -> s.getName().equalsIgnoreCase(request.getName()))
                     .findFirst()
                     .orElse(null);
-            
+
             if (existingSpot != null) {
                 spot = existingSpot;
             } else {
@@ -158,14 +160,15 @@ public class CheckInController {
                 user.getId());
 
         if (lastCheckIn != null) {
-            LocalDateTime limit = LocalDateTime.now().minusSeconds(1); // Same threshold as existing config
+            LocalDateTime limit = LocalDateTime.now().minusSeconds(60); // Same threshold as existing config
             if (lastCheckIn.getCheckInTime().isAfter(limit)) {
                 return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                         .body("Slow down! You can only boost the vibe once per hour.");
             }
         }
 
-        // Calculate actual intensity based on recent check-ins in the database (including this new one)
+        // Calculate actual intensity based on recent check-ins in the database
+        // (including this new one)
         LocalDateTime oneHourAgo = LocalDateTime.now().minusHours(1);
         List<CheckIn> recentCheckIns = checkInRepository.findBySpotIdAndCheckInTimeAfter(spot.getId(), oneHourAgo);
         long count = recentCheckIns.size() + 1; // recent check-ins + this new one
