@@ -167,14 +167,7 @@ export default function AccountScreen() {
   };
 
   const handleSignOut = async () => {
-    try {
-      await SecureStore.deleteItemAsync('userId');
-      await SecureStore.deleteItemAsync('user_token');
-    } catch (error) {
-      console.error('Error clearing local cache tokens during sign out:', error);
-    } finally {
-      signOut();
-    }
+    signOut();
   };
 
   const handleDeleteAccount = () => {
@@ -211,8 +204,6 @@ export default function AccountScreen() {
         return;
       }
 
-      await SecureStore.deleteItemAsync('userId');
-      await SecureStore.deleteItemAsync('user_token');
       await SecureStore.setItemAsync('account_deleted_banner', 'true');
       signOut();
     } catch (error) {

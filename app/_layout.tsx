@@ -5,6 +5,8 @@ import { ThemeProvider } from '../theme/ThemeContext';
 import { useEffect, useState, createContext, useContext } from 'react';
 import Constants from 'expo-constants';
 import Mapbox from '@rnmapbox/maps';
+import * as SecureStore from 'expo-secure-store';
+
 export type UserSession = {
   name: string;
   email: string;
@@ -13,8 +15,8 @@ export type UserSession = {
 
 const AuthContext = createContext<{ 
   user: UserSession; 
-  signIn: (userData: UserSession) => void; 
-  signOut: () => void 
+  signIn: (userData: UserSession) => Promise<void> | void; 
+  signOut: () => Promise<void> | void;
 } | null>(null);
 
 export const useAuth = () => useContext(AuthContext)!;
@@ -36,7 +38,37 @@ export default function Layout() {
   const router = useRouter();
 
   useEffect(() => {
-    setIsReady(true);
+    const restoreSession = async () => {
+      try {
+        const token = await SecureStore.getItemAsync('user_token');
+        const sessionStr = await SecureStore.getItemAsync('user_session');
+
+        if (token && sessionStr) {
+          const session = JSON.parse(sessionStr);
+          const sessionAge = Date.now() - (session.loginTime || 0);
+          const MAX_SESSION_AGE = 10 * 24 * 60 * 60 * 1000; // 10 days in ms
+
+          if (sessionAge < MAX_SESSION_AGE) {
+            setUser({
+              name: session.name,
+              email: session.email,
+              profilePicture: session.profilePicture,
+            });
+          } else {
+            // Session expired, clean up
+            await SecureStore.deleteItemAsync('user_session');
+            await SecureStore.deleteItemAsync('user_token');
+            await SecureStore.deleteItemAsync('userId');
+          }
+        }
+      } catch (error) {
+        console.error('Error restoring session:', error);
+      } finally {
+        setIsReady(true);
+      }
+    };
+
+    restoreSession();
   }, []);
 
   useEffect(() => {
@@ -51,13 +83,39 @@ export default function Layout() {
     }
   }, [user, segments, isReady]);
 
+  const signIn = async (userData: UserSession) => {
+    if (userData) {
+      try {
+        await SecureStore.setItemAsync('user_session', JSON.stringify({
+          ...userData,
+          loginTime: Date.now()
+        }));
+      } catch (error) {
+        console.error('Error saving user session:', error);
+      }
+    }
+    setUser(userData);
+  };
+
+  const signOut = async () => {
+    try {
+      await SecureStore.deleteItemAsync('user_session');
+      await SecureStore.deleteItemAsync('user_token');
+      await SecureStore.deleteItemAsync('userId');
+    } catch (error) {
+      console.error('Error clearing local cache tokens during sign out:', error);
+    } finally {
+      setUser(null);
+    }
+  };
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ThemeProvider>
         <AuthContext.Provider value={{
           user,
-          signIn: (userData) => setUser(userData), // Now accepts and sets real user profile metrics
-          signOut: () => setUser(null)
+          signIn,
+          signOut
         }}>
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="(auth)/login" options={{ animation: 'fade' }} />
