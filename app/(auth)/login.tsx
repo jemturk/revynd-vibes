@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, Animated } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, Animated, Image } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useAuth } from '../_layout';
 import { useTheme } from '../../theme/ThemeContext';
@@ -34,7 +34,7 @@ export default function LoginScreen() {
         setAlertConfig({ msg, type });
 
         Animated.spring(slideAnim, {
-            toValue: Platform.OS === 'ios' ? 85 : 65,
+            toValue: Platform.OS === 'ios' ? 110 : 90,
             useNativeDriver: true,
             tension: 50,
             friction: 8,
@@ -46,7 +46,7 @@ export default function LoginScreen() {
                 duration: 500,
                 useNativeDriver: true,
             }).start(() => setAlertConfig({ msg: '', type: null }));
-        }, 3500);
+        }, 6000);
     };
 
     useEffect(() => {
@@ -448,6 +448,7 @@ export default function LoginScreen() {
                 style={styles.container}
             >
                 <View style={styles.innerContainer}>
+                    <Image source={require('../../assets/icon.png')} style={styles.appLogo} />
                     <Text style={styles.logo}>REVYND</Text>
                     <Text style={styles.subtitle}>
                         Reset your password
@@ -525,6 +526,7 @@ export default function LoginScreen() {
                 style={styles.container}
             >
                 <View style={styles.innerContainer}>
+                    <Image source={require('../../assets/icon.png')} style={styles.appLogo} />
                     <Text style={styles.logo}>REVYND</Text>
                     <Text style={styles.subtitle}>
                         Choose a new password
@@ -638,6 +640,7 @@ export default function LoginScreen() {
                 style={styles.container}
             >
                 <View style={styles.innerContainer}>
+                    <Image source={require('../../assets/icon.png')} style={styles.appLogo} />
                     <Text style={styles.logo}>REVYND</Text>
                     <Text style={styles.subtitle}>
                         Verify your email address
@@ -729,6 +732,7 @@ export default function LoginScreen() {
             style={styles.container}
         >
             <View style={styles.innerContainer}>
+                <Image source={require('../../assets/icon.png')} style={styles.appLogo} />
                 <Text style={styles.logo}>REVYND</Text>
                 <Text style={styles.subtitle}>
                     {isSignUp ? "Create an account to track the vibe." : "Welcome back. Check the session."}
@@ -837,6 +841,13 @@ export default function LoginScreen() {
 const makeStyles = (theme) => StyleSheet.create({
     container: { flex: 1, backgroundColor: theme.background },
     innerContainer: { flex: 1, justifyContent: 'center', padding: 24 },
+    appLogo: {
+        width: 80,
+        height: 80,
+        alignSelf: 'center',
+        marginBottom: 12,
+        borderRadius: 20,
+    },
     logo: { fontSize: 46, fontWeight: '900', color: theme.primary, textAlign: 'center', letterSpacing: 2 },
     subtitle: { textAlign: 'center', marginBottom: 20, fontSize: 15, fontWeight: '500', color: theme.subtext },
     errorText: { color: '#EF4444', backgroundColor: theme.card, padding: 12, borderRadius: 8, marginBottom: 20, textAlign: 'center', fontWeight: '600', fontSize: 14 },
