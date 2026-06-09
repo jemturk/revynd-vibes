@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Modal, Pressable, Alert, Image, ActivityIndicator, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Modal, Pressable, Alert, Image, ActivityIndicator, TextInput, Linking } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme, AppTheme } from '../../theme/ThemeContext';
 import { useAuth } from '../_layout';
@@ -326,7 +326,18 @@ export default function AccountScreen() {
             setShowEditModal(true);
           }} 
         />
-        <AccountItem icon="security" label="Privacy Policy" styles={styles} onPress={() => { }} />
+        <AccountItem 
+          icon="security" 
+          label="Privacy Policy" 
+          styles={styles} 
+          onPress={() => {
+            Linking.openURL('https://revynd-api-939729691035.us-east1.run.app/privacy-policy.html')
+              .catch(err => {
+                console.error('Failed to open privacy policy URL:', err);
+                Alert.alert('Error', 'Unable to open privacy policy webpage.');
+              });
+          }} 
+        />
         <AccountItem icon="exit-to-app" label="Sign Out" styles={styles} onPress={handleSignOut} color="#fb923c" />
         <AccountItem icon="delete" label="Delete Account" styles={styles} onPress={handleDeleteAccount} destructive />
       </View>
