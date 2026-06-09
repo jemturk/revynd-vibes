@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Modal, Pressable, Alert, Image, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Modal, Pressable, Alert, Image, ActivityIndicator, TextInput } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme, AppTheme } from '../../theme/ThemeContext';
 import { useAuth } from '../_layout';
@@ -47,6 +47,11 @@ export default function AccountScreen() {
   const [deleteErrorMessage, setDeleteErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editErrorMessage, setEditErrorMessage] = useState<string | null>(null);
+  const [updatingProfile, setUpdatingProfile] = useState(false);
 
   const API_URL = 'https://revynd-api-939729691035.us-east1.run.app';
 
@@ -212,6 +217,53 @@ export default function AccountScreen() {
     }
   };
 
+  const handleSaveProfile = async () => {
+    if (!editName.trim()) {
+      setEditErrorMessage('Name is required.');
+      return;
+    }
+    if (editName.trim().length < 3) {
+      setEditErrorMessage('Name must be at least 3 characters long.');
+      return;
+    }
+
+    setUpdatingProfile(true);
+    setEditErrorMessage(null);
+
+    try {
+      const response = await fetch(`${API_URL}/api/auth/profile`, {
+        method: 'PUT',
+        headers: await buildAuthHeaders('application/json'),
+        body: JSON.stringify({ name: editName.trim() }),
+      });
+
+      const raw = await response.text();
+      let payload: any = {};
+      try { payload = raw ? JSON.parse(raw) : {}; } catch { payload = { message: raw?.trim() } }
+
+      if (!response.ok) {
+        const msg = payload?.message || `Failed to update profile (${response.status}).`;
+        setEditErrorMessage(msg);
+        return;
+      }
+
+      if (user) {
+        signIn({
+          ...user,
+          name: payload.name || editName.trim(),
+        });
+      }
+
+      setShowEditModal(false);
+      setSuccessMessage('Profile updated successfully!');
+    } catch (error) {
+      console.error('Update profile error:', error);
+      setEditErrorMessage('Unable to save changes. Please try again later.');
+    } finally {
+      setUpdatingProfile(false);
+    }
+  };
+
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
@@ -264,11 +316,92 @@ export default function AccountScreen() {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Account</Text>
-        <AccountItem icon="person-outline" label="Edit Profile" styles={styles} onPress={() => { }} />
+        <AccountItem 
+          icon="person-outline" 
+          label="Edit Profile" 
+          styles={styles} 
+          onPress={() => {
+            setEditName(user?.name || '');
+            setEditErrorMessage(null);
+            setShowEditModal(true);
+          }} 
+        />
         <AccountItem icon="security" label="Privacy Policy" styles={styles} onPress={() => { }} />
         <AccountItem icon="exit-to-app" label="Sign Out" styles={styles} onPress={handleSignOut} color="#fb923c" />
         <AccountItem icon="delete" label="Delete Account" styles={styles} onPress={handleDeleteAccount} destructive />
       </View>
+
+      {/* Edit Profile Modal */}
+      <Modal
+        visible={showEditModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setShowEditModal(false);
+          setEditErrorMessage(null);
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>Edit Profile</Text>
+            <Text style={styles.modalMessage}>
+              Update your display name below.
+            </Text>
+
+            {editErrorMessage ? (
+              <Text style={{ color: '#ef4444', marginBottom: 12, fontWeight: '600', fontSize: 14 }}>
+                {editErrorMessage}
+              </Text>
+            ) : null}
+
+            <TextInput
+              style={{
+                padding: 14,
+                borderRadius: 12,
+                fontSize: 16,
+                backgroundColor: theme.background,
+                color: theme.text,
+                borderWidth: 1,
+                borderColor: theme.border,
+                marginBottom: 20,
+                width: '100%'
+              }}
+              placeholder="Display Name"
+              placeholderTextColor={theme.subtext}
+              value={editName}
+              onChangeText={setEditName}
+              autoCapitalize="words"
+            />
+
+            <View style={styles.modalButtons}>
+              <Pressable
+                style={[styles.modalButton, styles.modalCancelButton]}
+                disabled={updatingProfile}
+                onPress={() => {
+                  setShowEditModal(false);
+                  setEditErrorMessage(null);
+                }}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[
+                  styles.modalButton,
+                  { backgroundColor: '#FB923C' }
+                ]}
+                disabled={updatingProfile}
+                onPress={handleSaveProfile}
+              >
+                {updatingProfile ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>Save</Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Profile Picture Option Drawer Modal */}
       <Modal

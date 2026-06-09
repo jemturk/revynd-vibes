@@ -174,6 +174,24 @@ public class AuthService {
     }
 
     @Transactional
+    public User updateProfileName(String email, String name) {
+        logger.info("Updating profile name for email target: {}", email);
+        User user = getUserByEmail(email);
+        user.setName(name);
+        
+        try {
+            User savedUser = userRepository.save(user);
+            userRepository.flush();
+            entityManager.flush();
+            logger.info("Profile name updated successfully for user ID: {}", savedUser.getId());
+            return savedUser;
+        } catch (Exception ex) {
+            logger.error("Failed to persist updated profile name: ", ex);
+            throw new RuntimeException("Failed to save updated profile name: " + ex.getMessage());
+        }
+    }
+
+    @Transactional
     public void generateAndSendVerificationCode(User user) {
         String code = String.format("%06d", new java.util.Random().nextInt(1000000));
         user.setVerificationCode(code);

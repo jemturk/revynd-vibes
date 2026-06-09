@@ -171,6 +171,29 @@ public class AuthController {
         ));
     }
 
+    @PutMapping("/profile")
+    public ResponseEntity<?> updateProfile(@RequestBody Map<String, String> request, Principal principal) {
+        if (principal == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "User is not authenticated."));
+        }
+        
+        String email = principal.getName();
+        String name = request.get("name");
+        
+        if (name == null || name.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Name payload is required and cannot be empty."));
+        }
+        if (name.trim().length() < 3) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Your name should be at least 3 characters long."));
+        }
+        
+        User updatedUser = authService.updateProfileName(email, name.trim());
+        return ResponseEntity.ok(Map.of(
+            "message", "Profile updated successfully",
+            "name", updatedUser.getName()
+        ));
+    }
+
     private String generateJwtToken(String email) {
         long now = System.currentTimeMillis();
         return Jwts.builder()
