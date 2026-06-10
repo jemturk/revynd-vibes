@@ -797,7 +797,7 @@ export default function LoginScreen() {
                     {isSignUp ? "Create an account to track the vibe." : "Welcome back. Check the session."}
                 </Text>
 
-                {/* Error Warning Banner Layout */}
+                {/* Error Warning Banner Layout  */}
                 {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
 
                 {isSignUp && (
