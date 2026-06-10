@@ -97,7 +97,7 @@ export default function AccountScreen() {
         const peak = await SecureStore.getItemAsync('notif_vibe_peak');
         const prox = await SecureStore.getItemAsync('notif_proximity');
         const soc = await SecureStore.getItemAsync('notif_social');
-        
+
         if (peak !== null) setNotifVibePeak(peak !== 'false');
         if (prox !== null) setNotifProximity(prox !== 'false');
         if (soc !== null) setNotifSocial(soc !== 'false');
@@ -525,7 +525,6 @@ export default function AccountScreen() {
         setSearchResults(prev =>
           prev ? prev.map(c => c.id === targetUserId ? { ...c, relationship: 'PENDING' } : c) : null
         );
-        Alert.alert('Success', 'Friend request sent!');
       } else {
         const raw = await response.text();
         let payload: any = {};
@@ -688,11 +687,11 @@ export default function AccountScreen() {
             />
           }
         />
-        <AccountItem 
-          icon="notifications-none" 
-          label="Notifications" 
-          styles={styles} 
-          onPress={() => setShowNotifModal(true)} 
+        <AccountItem
+          icon="notifications-none"
+          label="Notifications"
+          styles={styles}
+          onPress={() => setShowNotifModal(true)}
         />
       </View>
 
@@ -1126,38 +1125,6 @@ export default function AccountScreen() {
             <Text style={styles.modalMessage}>
               Search for users by email or phone number, or sync your phonebook contacts.
             </Text>
-
-            {/* Search Bar */}
-            <View style={styles.searchBarContainer}>
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Search by email or phone number..."
-                placeholderTextColor={theme.subtext}
-                value={searchQuery}
-                onChangeText={(val) => {
-                  setSearchQuery(val);
-                  if (!val.trim()) {
-                    setSearchResults(null);
-                  }
-                }}
-                autoCapitalize="none"
-                keyboardType="email-address"
-              />
-              {searchQuery.trim() ? (
-                <TouchableOpacity
-                  style={{ marginRight: 8, justifyContent: 'center' }}
-                  onPress={() => {
-                    setSearchQuery('');
-                    setSearchResults(null);
-                  }}
-                >
-                  <MaterialIcons name="close" size={20} color={theme.subtext} />
-                </TouchableOpacity>
-              ) : null}
-              <TouchableOpacity style={styles.searchButton} onPress={handleSearchFriend}>
-                <MaterialIcons name="search" size={20} color="#FFF" />
-              </TouchableOpacity>
-            </View>
 
             {isSearching || isSyncingContacts ? (
               <View style={{ paddingVertical: 40, alignItems: 'center' }}>
