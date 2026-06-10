@@ -201,6 +201,57 @@ public class FriendshipController {
         return ResponseEntity.ok(matches);
     }
 
+    @GetMapping("/search")
+    public ResponseEntity<?> searchFriend(@RequestParam String query, Principal principal) {
+        if (query == null || query.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Search query is required."));
+        }
+
+        String email = principal.getName();
+        User currentUser = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        String cleanQuery = query.trim().toLowerCase();
+        Optional<User> foundUserOpt = userRepository.findByEmail(cleanQuery);
+
+        if (foundUserOpt.isEmpty()) {
+            // Try searching by phone number
+            String cleanPhone = query.replaceAll("\\D", "");
+            if (!cleanPhone.isEmpty()) {
+                foundUserOpt = userRepository.findAll().stream()
+                        .filter(u -> u.getPhoneNumber() != null && u.getPhoneNumber().replaceAll("\\D", "").equals(cleanPhone))
+                        .findFirst();
+            }
+        }
+
+        if (foundUserOpt.isEmpty()) {
+            return ResponseEntity.ok(Collections.emptyList());
+        }
+
+        User u = foundUserOpt.get();
+        if (u.getId().equals(currentUser.getId())) {
+            return ResponseEntity.ok(Collections.emptyList()); // Don't return self
+        }
+
+        Optional<Friendship> rel = friendshipRepository.findAnyRelationship(currentUser.getId(), u.getId());
+        String relationshipStatus = "NONE";
+        Long friendshipId = null;
+
+        if (rel.isPresent()) {
+            relationshipStatus = rel.get().getStatus();
+            friendshipId = rel.get().getId();
+        }
+
+        Map<String, Object> match = new HashMap<>();
+        match.put("id", u.getId());
+        match.put("name", u.getName());
+        match.put("profilePicture", u.getProfilePicture() != null ? u.getProfilePicture() : "");
+        match.put("relationship", relationshipStatus);
+        match.put("friendshipId", friendshipId != null ? String.valueOf(friendshipId) : "");
+
+        return ResponseEntity.ok(List.of(match));
+    }
+
     private String sha256(String input) {
         if (input == null) return null;
         try {

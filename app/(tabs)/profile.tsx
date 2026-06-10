@@ -162,6 +162,11 @@ export default function AccountScreen() {
   const [isSyncingContacts, setIsSyncingContacts] = useState(false);
   const [syncedContacts, setSyncedContacts] = useState<any[]>([]);
 
+  // Contact Sync Search state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<any[] | null>(null);
+
   // Friends List state
   const [showFriendsModal, setShowFriendsModal] = useState(false);
   const [friendsActiveTab, setFriendsActiveTab] = useState<'friends' | 'pending'>('friends');
@@ -531,6 +536,8 @@ export default function AccountScreen() {
     }
     setIsSyncingContacts(true);
     setSyncedContacts([]);
+    setSearchQuery('');
+    setSearchResults(null);
     setShowContactsModal(true);
 
     try {
@@ -596,6 +603,9 @@ export default function AccountScreen() {
         setSyncedContacts(prev =>
           prev.map(c => c.id === targetUserId ? { ...c, relationship: 'PENDING' } : c)
         );
+        setSearchResults(prev =>
+          prev ? prev.map(c => c.id === targetUserId ? { ...c, relationship: 'PENDING' } : c) : null
+        );
         Alert.alert('Success', 'Friend request sent!');
       } else {
         const raw = await response.text();
@@ -605,6 +615,30 @@ export default function AccountScreen() {
       }
     } catch (err) {
       console.error('Add friend from sync error:', err);
+    }
+  };
+
+  const handleSearchFriend = async () => {
+    if (!searchQuery.trim()) {
+      setSearchResults(null);
+      return;
+    }
+    setIsSearching(true);
+    try {
+      const response = await fetch(`${API_URL}/api/friends/search?query=${encodeURIComponent(searchQuery.trim())}`, {
+        headers: await buildAuthHeaders(),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setSearchResults(data);
+      } else {
+        Alert.alert('Search Failed', 'Unable to search for user.');
+      }
+    } catch (err) {
+      console.error('Search error:', err);
+      Alert.alert('Error', 'An unexpected error occurred during search.');
+    } finally {
+      setIsSearching(false);
     }
   };
 
@@ -765,7 +799,7 @@ export default function AccountScreen() {
         />
         <AccountItem
           icon="contacts"
-          label="Find Friends from Contacts"
+          label="Find Friends (Contacts / Search)"
           styles={styles}
           onPress={handleSyncContacts}
         />
@@ -1169,26 +1203,62 @@ export default function AccountScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContainer, { maxHeight: '80%' }]}>
-            <Text style={styles.modalTitle}>Contacts on REVYND</Text>
+            <Text style={styles.modalTitle}>Find Friends</Text>
             <Text style={styles.modalMessage}>
-              Here are your phonebook contacts who are already on the app:
+              Search for users by email or phone number, or sync your phonebook contacts.
             </Text>
 
-            {isSyncingContacts ? (
+            {/* Search Bar */}
+            <View style={styles.searchBarContainer}>
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search by email or phone number..."
+                placeholderTextColor={theme.subtext}
+                value={searchQuery}
+                onChangeText={(val) => {
+                  setSearchQuery(val);
+                  if (!val.trim()) {
+                    setSearchResults(null);
+                  }
+                }}
+                autoCapitalize="none"
+                keyboardType="email-address"
+              />
+              {searchQuery.trim() ? (
+                <TouchableOpacity
+                  style={{ marginRight: 8, justifyContent: 'center' }}
+                  onPress={() => {
+                    setSearchQuery('');
+                    setSearchResults(null);
+                  }}
+                >
+                  <MaterialIcons name="close" size={20} color={theme.subtext} />
+                </TouchableOpacity>
+              ) : null}
+              <TouchableOpacity style={styles.searchButton} onPress={handleSearchFriend}>
+                <MaterialIcons name="search" size={20} color="#FFF" />
+              </TouchableOpacity>
+            </View>
+
+            {isSearching || isSyncingContacts ? (
               <View style={{ paddingVertical: 40, alignItems: 'center' }}>
                 <ActivityIndicator size="large" color="#FB923C" />
-                <Text style={{ marginTop: 12, color: theme.subtext, fontWeight: '500' }}>Matching contacts...</Text>
+                <Text style={{ marginTop: 12, color: theme.subtext, fontWeight: '500' }}>
+                  {isSearching ? 'Searching...' : 'Matching contacts...'}
+                </Text>
               </View>
-            ) : syncedContacts.length === 0 ? (
+            ) : (searchResults !== null ? searchResults : syncedContacts).length === 0 ? (
               <View style={{ paddingVertical: 40, alignItems: 'center' }}>
                 <MaterialIcons name="person-search" size={48} color={theme.border} />
                 <Text style={{ marginTop: 12, color: theme.subtext, textAlign: 'center', fontWeight: '500' }}>
-                  No new contacts found on the app.
+                  {searchResults !== null
+                    ? 'No user found matching search query.'
+                    : 'No new contacts found on the app.'}
                 </Text>
               </View>
             ) : (
               <ScrollView style={{ marginBottom: 20 }}>
-                {syncedContacts.map((contact) => (
+                {(searchResults !== null ? searchResults : syncedContacts).map((contact) => (
                   <View key={contact.id} style={styles.friendRow}>
                     <View style={styles.friendAvatar}>
                       {contact.profilePicture ? (
@@ -1686,5 +1756,29 @@ const makeStyles = (theme: AppTheme) => StyleSheet.create({
     color: theme.subtext,
     marginTop: 4,
     lineHeight: 16,
+  },
+  searchBarContainer: {
+    flexDirection: 'row',
+    marginBottom: 16,
+    alignItems: 'center',
+    backgroundColor: theme.background,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: theme.border,
+    paddingHorizontal: 12,
+    paddingVertical: 2,
+  },
+  searchInput: {
+    flex: 1,
+    height: 40,
+    color: theme.text,
+    fontSize: 15,
+  },
+  searchButton: {
+    backgroundColor: '#FB923C',
+    padding: 8,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
