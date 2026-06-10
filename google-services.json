@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "827127584739",
+    "project_id": "revynd-b70f1",
+    "storage_bucket": "revynd-b70f1.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:827127584739:android:83779dcdaa032f7f7cb2d6",
+        "android_client_info": {
+          "package_name": "com.jemturk.revynd"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCDvK_Jk84dK7oV4LzNwkY_dQbNoP7fhfc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
