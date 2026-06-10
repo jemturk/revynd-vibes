@@ -4,6 +4,8 @@ import com.jemturk.revynd.backend.dto.RegisterRequest;
 import com.jemturk.revynd.backend.model.User;
 import com.jemturk.revynd.backend.repository.CheckInRepository;
 import com.jemturk.revynd.backend.repository.UserRepository;
+import com.jemturk.revynd.backend.model.Friendship;
+import com.jemturk.revynd.backend.repository.FriendshipRepository;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -25,15 +27,17 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final CheckInRepository checkInRepository;
+    private final FriendshipRepository friendshipRepository;
     private final BCryptPasswordEncoder passwordEncoder;
     private final EmailService emailService;
 
     private static final Pattern UPPERCASE_PATTERN = Pattern.compile("[A-Z]");
     private static final Pattern SPECIAL_CHAR_PATTERN = Pattern.compile("[!@#$%^&*(),.?\":{}|<>]");
 
-    public AuthService(UserRepository userRepository, CheckInRepository checkInRepository, EmailService emailService) {
+    public AuthService(UserRepository userRepository, CheckInRepository checkInRepository, FriendshipRepository friendshipRepository, EmailService emailService) {
         this.userRepository = userRepository;
         this.checkInRepository = checkInRepository;
+        this.friendshipRepository = friendshipRepository;
         this.emailService = emailService;
         this.passwordEncoder = new BCryptPasswordEncoder();
     }
@@ -77,11 +81,27 @@ public class AuthService {
         // Processing: Hash credentials and compile user entity
         String securePasswordHash = passwordEncoder.encode(password);
         User newUser = new User(request.getName().trim(), email, securePasswordHash);
+        if (request.getPhoneNumber() != null && !request.getPhoneNumber().trim().isEmpty()) {
+            newUser.setPhoneNumber(request.getPhoneNumber().trim());
+        }
 
         // Execution: Force transactional write and immediate disk flush
         try {
             logger.info("💾 Saving entity to repository context...");
             User savedUser = userRepository.save(newUser);
+
+            // Handle invite/referrer link auto-friendship connection
+            if (request.getReferrerId() != null) {
+                userRepository.findById(request.getReferrerId()).ifPresent(referrer -> {
+                    logger.info("Automatically connecting friendship between referrer: {} and new user: {}", 
+                        referrer.getId(), savedUser.getId());
+                    Friendship friendship = new Friendship();
+                    friendship.setRequester(referrer);
+                    friendship.setReceiver(savedUser);
+                    friendship.setStatus("ACCEPTED"); // Automatically establish accepted friend status on invite registration
+                    friendshipRepository.save(friendship);
+                });
+            }
 
             // Generate and send verification code (which will also flush changes)
             generateAndSendVerificationCode(savedUser);

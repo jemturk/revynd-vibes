@@ -6,6 +6,7 @@ import { useEffect, useState, createContext, useContext } from 'react';
 import Constants from 'expo-constants';
 import Mapbox from '@rnmapbox/maps';
 import * as SecureStore from 'expo-secure-store';
+import * as Linking from 'expo-linking';
 
 export type UserSession = {
   name: string;
@@ -36,6 +37,40 @@ export default function Layout() {
   const [isReady, setIsReady] = useState(false);
   const segments = useSegments();
   const router = useRouter();
+
+  useEffect(() => {
+    const handleInitialUrl = async () => {
+      const initialUrl = await Linking.getInitialURL();
+      if (initialUrl) {
+        parseAndSaveReferrer(initialUrl);
+      }
+    };
+
+    const subscription = Linking.addEventListener('url', (event) => {
+      if (event.url) {
+        parseAndSaveReferrer(event.url);
+      }
+    });
+
+    handleInitialUrl();
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
+  const parseAndSaveReferrer = async (urlStr: string) => {
+    try {
+      const parsed = Linking.parse(urlStr);
+      const refId = parsed.queryParams?.referrerId;
+      if (refId) {
+        console.log('Detected referrerId from deep link:', refId);
+        await SecureStore.setItemAsync('invite_referrer_id', refId as string);
+      }
+    } catch (e) {
+      console.error('Failed to parse deep link URL', e);
+    }
+  };
 
   useEffect(() => {
     const restoreSession = async () => {

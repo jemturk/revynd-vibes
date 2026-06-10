@@ -63,6 +63,18 @@ export default {
         {
           "locationWhenInUsePermission": "Allow Revynd to find local spots near you."
         }
+      ],
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "Allow Revynd to find friends in your address book."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Revynd to scan friend QR codes."
+        }
       ]
     ],
     "extra": {

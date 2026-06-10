@@ -12,6 +12,7 @@ export default function LoginScreen() {
 
     const [isSignUp, setIsSignUp] = useState(true);
     const [name, setName] = useState('');
+    const [phoneNumber, setPhoneNumber] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [isPasswordVisible, setIsPasswordVisible] = useState(false);
@@ -68,7 +69,7 @@ export default function LoginScreen() {
         setErrorMsg('');
 
         // 1. Basic Presence Validation (with clean string trimming)
-        if (!email.trim() || !password || (isSignUp && !name.trim())) {
+        if (!email.trim() || !password || (isSignUp && (!name.trim() || !phoneNumber.trim()))) {
             setErrorMsg('All fields are required.');
             return false;
         }
@@ -114,6 +115,21 @@ export default function LoginScreen() {
         const normalizedEmail = email.trim().toLowerCase();
         const endpoint = isSignUp ? '/api/auth/register' : '/api/auth/login';
 
+        let referrerId: number | null = null;
+        if (isSignUp) {
+            try {
+                const storedReferrerId = await SecureStore.getItemAsync('invite_referrer_id');
+                if (storedReferrerId) {
+                    const parsedRef = parseInt(storedReferrerId, 10);
+                    if (!isNaN(parsedRef)) {
+                        referrerId = parsedRef;
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to retrieve invite_referrer_id:', err);
+            }
+        }
+
         // Hardcoding the live Google Cloud Run Service URL directly
         const BASE_URL = 'https://revynd-api-939729691035.us-east1.run.app';
 
@@ -128,6 +144,8 @@ export default function LoginScreen() {
                     name: isSignUp ? name.trim() : undefined,
                     email: normalizedEmail,
                     password: password,
+                    phoneNumber: isSignUp ? phoneNumber.trim() : undefined,
+                    referrerId: isSignUp ? referrerId : undefined,
                 }),
             });
 
@@ -203,6 +221,9 @@ export default function LoginScreen() {
             if (data.token) {
                 await SecureStore.setItemAsync('user_token', data.token);
             }
+            if (data.id) {
+                await SecureStore.setItemAsync('userId', String(data.id));
+            }
 
             signIn({
                 name: data.name || 'Rider',
@@ -258,6 +279,10 @@ export default function LoginScreen() {
             if (data.token) {
                 await SecureStore.setItemAsync('user_token', data.token);
             }
+            if (data.id) {
+                await SecureStore.setItemAsync('userId', String(data.id));
+            }
+            await SecureStore.deleteItemAsync('invite_referrer_id').catch(() => {});
 
             signIn({
                 name: data.name || 'Rider',
@@ -742,14 +767,25 @@ export default function LoginScreen() {
                 {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
 
                 {isSignUp && (
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Full Name"
-                        placeholderTextColor={theme.subtext}
-                        value={name}
-                        onChangeText={setName}
-                        autoCapitalize="words"
-                    />
+                    <>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Full Name"
+                            placeholderTextColor={theme.subtext}
+                            value={name}
+                            onChangeText={setName}
+                            autoCapitalize="words"
+                        />
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Phone Number"
+                            placeholderTextColor={theme.subtext}
+                            value={phoneNumber}
+                            onChangeText={setPhoneNumber}
+                            autoCapitalize="none"
+                            keyboardType="phone-pad"
+                        />
+                    </>
                 )}
 
                 <TextInput

@@ -32,6 +32,9 @@ public class User {
     @Column(name = "profile_picture", columnDefinition = "TEXT")
     private String profilePicture;
 
+    @Column(name = "phone_number")
+    private String phoneNumber;
+
     @Column(name = "push_token")
     private String pushToken;
 
@@ -75,6 +78,9 @@ public class User {
     public void setPassword(String password) { this.password = password; }
     public String getProfilePicture() { return profilePicture; }
     public void setProfilePicture(String profilePicture) { this.profilePicture = profilePicture; }
+
+    public String getPhoneNumber() { return phoneNumber; }
+    public void setPhoneNumber(String phoneNumber) { this.phoneNumber = phoneNumber; }
 
     public String getPushToken() { return pushToken; }
     public void setPushToken(String pushToken) { this.pushToken = pushToken; }
