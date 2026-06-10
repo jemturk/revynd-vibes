@@ -242,6 +242,9 @@ public class CheckInController {
             if (u.getLastLatitude() == null || u.getLastLongitude() == null || u.getPushToken() == null) {
                 continue;
             }
+            if (!u.isNotifVibePeak()) {
+                continue; // Skip if user disabled vibe peak alerts
+            }
             
             // Haversine formula for exact 5-mile (8046.72 meters) circle verification
             double distance = calculateDistanceInMeters(spotLat, spotLng, u.getLastLatitude(), u.getLastLongitude());

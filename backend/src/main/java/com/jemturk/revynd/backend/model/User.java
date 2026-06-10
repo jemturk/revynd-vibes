@@ -44,6 +44,15 @@ public class User {
     @Column(name = "last_longitude")
     private Double lastLongitude;
 
+    @Column(name = "notif_vibe_peak", nullable = false, columnDefinition = "boolean default true")
+    private boolean notifVibePeak = true;
+
+    @Column(name = "notif_proximity", nullable = false, columnDefinition = "boolean default true")
+    private boolean notifProximity = true;
+
+    @Column(name = "notif_social", nullable = false, columnDefinition = "boolean default true")
+    private boolean notifSocial = true;
+
     @Column(nullable = false)
     private boolean verified = false;
 
@@ -100,4 +109,11 @@ public class User {
     public void setResetPasswordCode(String resetPasswordCode) { this.resetPasswordCode = resetPasswordCode; }
     public java.time.LocalDateTime getResetPasswordCodeExpiresAt() { return resetPasswordCodeExpiresAt; }
     public void setResetPasswordCodeExpiresAt(java.time.LocalDateTime resetPasswordCodeExpiresAt) { this.resetPasswordCodeExpiresAt = resetPasswordCodeExpiresAt; }
+
+    public boolean isNotifVibePeak() { return notifVibePeak; }
+    public void setNotifVibePeak(boolean notifVibePeak) { this.notifVibePeak = notifVibePeak; }
+    public boolean isNotifProximity() { return notifProximity; }
+    public void setNotifProximity(boolean notifProximity) { this.notifProximity = notifProximity; }
+    public boolean isNotifSocial() { return notifSocial; }
+    public void setNotifSocial(boolean notifSocial) { this.notifSocial = notifSocial; }
 }

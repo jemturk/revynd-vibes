@@ -172,7 +172,10 @@ export default function TabLayout() {
         
         if (active) {
           await registerDeviceOnBackend(token, initialLoc.coords.latitude, initialLoc.coords.longitude);
-          await checkProximityToSpots(initialLoc.coords.latitude, initialLoc.coords.longitude);
+          const proximityEnabled = await SecureStore.getItemAsync('notif_proximity').then(val => val !== 'false');
+          if (proximityEnabled) {
+            await checkProximityToSpots(initialLoc.coords.latitude, initialLoc.coords.longitude);
+          }
         }
       } catch (e) {
         console.error('Failed to get initial location', e);
@@ -196,8 +199,11 @@ export default function TabLayout() {
             // Send coordinates to backend to keep lastLocation accurate for Peak Alerts
             await registerDeviceOnBackend(token, latitude, longitude);
 
-            // Proximity check for nearby spots (within 50 meters)
-            await checkProximityToSpots(latitude, longitude);
+            // Proximity check for nearby spots (within 50 meters) if enabled
+            const proximityEnabled = await SecureStore.getItemAsync('notif_proximity').then(val => val !== 'false');
+            if (proximityEnabled) {
+              await checkProximityToSpots(latitude, longitude);
+            }
           }
         );
       } catch (err) {

@@ -83,12 +83,15 @@ public class AuthController {
         String token = generateJwtToken(authenticatedUser.getEmail());
 
         // 5. Map down the exact success signature your React Native client expects
-        Map<String, String> response = new HashMap<>();
+        Map<String, Object> response = new HashMap<>();
         response.put("id", String.valueOf(authenticatedUser.getId()));
         response.put("name", authenticatedUser.getName());
         response.put("email", authenticatedUser.getEmail());
         response.put("token", token);
         response.put("profilePicture", authenticatedUser.getProfilePicture());
+        response.put("notifVibePeak", authenticatedUser.isNotifVibePeak());
+        response.put("notifProximity", authenticatedUser.isNotifProximity());
+        response.put("notifSocial", authenticatedUser.isNotifSocial());
 
         return ResponseEntity.ok(response);
     }
@@ -104,12 +107,15 @@ public class AuthController {
         User verifiedUser = authService.verifyEmail(email, code);
         String token = generateJwtToken(verifiedUser.getEmail());
 
-        Map<String, String> response = new HashMap<>();
+        Map<String, Object> response = new HashMap<>();
         response.put("id", String.valueOf(verifiedUser.getId()));
         response.put("name", verifiedUser.getName());
         response.put("email", verifiedUser.getEmail());
         response.put("token", token);
         response.put("profilePicture", verifiedUser.getProfilePicture());
+        response.put("notifVibePeak", verifiedUser.isNotifVibePeak());
+        response.put("notifProximity", verifiedUser.isNotifProximity());
+        response.put("notifSocial", verifiedUser.isNotifSocial());
 
         return ResponseEntity.ok(response);
     }
@@ -217,6 +223,39 @@ public class AuthController {
         
         authService.registerDevice(email, pushToken, latitude, longitude);
         return ResponseEntity.ok(Map.of("message", "Device registered successfully"));
+    }
+
+    @PutMapping("/notification-settings")
+    public ResponseEntity<?> updateNotificationSettings(@RequestBody Map<String, Boolean> request, Principal principal) {
+        if (principal == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "User is not authenticated."));
+        }
+        
+        String email = principal.getName();
+        Boolean vibePeak = request.get("vibePeak");
+        Boolean proximity = request.get("proximity");
+        Boolean social = request.get("social");
+        
+        authService.updateNotificationSettings(email, vibePeak, proximity, social);
+        return ResponseEntity.ok(Map.of("message", "Notification settings updated successfully"));
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<?> getCurrentUser(Principal principal) {
+        if (principal == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "User is not authenticated."));
+        }
+        String email = principal.getName();
+        User user = authService.getUserByEmail(email);
+        Map<String, Object> response = new HashMap<>();
+        response.put("id", String.valueOf(user.getId()));
+        response.put("name", user.getName());
+        response.put("email", user.getEmail());
+        response.put("profilePicture", user.getProfilePicture());
+        response.put("notifVibePeak", user.isNotifVibePeak());
+        response.put("notifProximity", user.isNotifProximity());
+        response.put("notifSocial", user.isNotifSocial());
+        return ResponseEntity.ok(response);
     }
 
     /**

@@ -11,6 +11,8 @@ import java.util.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.jemturk.revynd.backend.service.ExpoPushNotificationService;
+
 @RestController
 @RequestMapping("/api/friends")
 @RequiredArgsConstructor
@@ -19,6 +21,7 @@ public class FriendshipController {
 
     private final UserRepository userRepository;
     private final FriendshipRepository friendshipRepository;
+    private final ExpoPushNotificationService expoPushNotificationService;
 
     @PostMapping("/request/{targetUserId}")
     @Transactional
@@ -45,6 +48,17 @@ public class FriendshipController {
         friendship.setStatus("PENDING");
         friendshipRepository.save(friendship);
 
+        // Send push notification if target user has social alerts enabled and a push token is registered
+        if (receiver.getPushToken() != null && receiver.isNotifSocial()) {
+            String title = "New Friend Request! 👥";
+            String body = requester.getName() + " sent you a friend request on REVYND.";
+            Map<String, Object> notifData = Map.of(
+                "type", "friend_request",
+                "requesterId", String.valueOf(requester.getId())
+            );
+            expoPushNotificationService.sendPushNotification(receiver.getPushToken(), title, body, notifData);
+        }
+
         return ResponseEntity.ok(Map.of("message", "Friend request sent successfully"));
     }
 
@@ -64,6 +78,18 @@ public class FriendshipController {
 
         friendship.setStatus("ACCEPTED");
         friendshipRepository.save(friendship);
+
+        // Send push notification to original requester if they have social alerts enabled and a push token registered
+        User requester = friendship.getRequester();
+        if (requester.getPushToken() != null && requester.isNotifSocial()) {
+            String title = "Friend Request Accepted! 🎉";
+            String body = currentUser.getName() + " accepted your friend request on REVYND.";
+            Map<String, Object> notifData = Map.of(
+                "type", "friend_accepted",
+                "friendId", String.valueOf(currentUser.getId())
+            );
+            expoPushNotificationService.sendPushNotification(requester.getPushToken(), title, body, notifData);
+        }
 
         return ResponseEntity.ok(Map.of("message", "Friend request accepted successfully"));
     }

@@ -239,6 +239,15 @@ export default function LoginScreen() {
             if (data.id) {
                 await SecureStore.setItemAsync('userId', String(data.id));
             }
+            if (data.notifVibePeak !== undefined) {
+                await SecureStore.setItemAsync('notif_vibe_peak', String(data.notifVibePeak));
+            }
+            if (data.notifProximity !== undefined) {
+                await SecureStore.setItemAsync('notif_proximity', String(data.notifProximity));
+            }
+            if (data.notifSocial !== undefined) {
+                await SecureStore.setItemAsync('notif_social', String(data.notifSocial));
+            }
 
             signIn({
                 name: data.name || 'Rider',
@@ -296,6 +305,15 @@ export default function LoginScreen() {
             }
             if (data.id) {
                 await SecureStore.setItemAsync('userId', String(data.id));
+            }
+            if (data.notifVibePeak !== undefined) {
+                await SecureStore.setItemAsync('notif_vibe_peak', String(data.notifVibePeak));
+            }
+            if (data.notifProximity !== undefined) {
+                await SecureStore.setItemAsync('notif_proximity', String(data.notifProximity));
+            }
+            if (data.notifSocial !== undefined) {
+                await SecureStore.setItemAsync('notif_social', String(data.notifSocial));
             }
             await SecureStore.deleteItemAsync('invite_referrer_id').catch(() => { });
 

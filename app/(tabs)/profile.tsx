@@ -13,7 +13,7 @@ function sha256PureJS(ascii: string): string {
   function rightRotate(value: number, amount: number) {
     return (value >>> amount) | (value << (32 - amount));
   }
-  
+
   const mathPow = Math.pow;
   const maxWord = mathPow(2, 32);
   const lengthProperty = 'length';
@@ -21,7 +21,7 @@ function sha256PureJS(ascii: string): string {
 
   const words: number[] = [];
   const asciiLength = ascii[lengthProperty];
-  
+
   const hash = sha256PureJS.h = sha256PureJS.h || [];
   const k = sha256PureJS.k = sha256PureJS.k || [];
   let primeCounter = k[lengthProperty];
@@ -90,9 +90,9 @@ function sha256PureJS(ascii: string): string {
   for (i = 0; i < 8; i++) {
     const word = currentHash[i];
     finalHash += ((word >>> 24) & 0xff).toString(16).padStart(2, '0') +
-                 ((word >>> 16) & 0xff).toString(16).padStart(2, '0') +
-                 ((word >>> 8) & 0xff).toString(16).padStart(2, '0') +
-                 (word & 0xff).toString(16).padStart(2, '0');
+      ((word >>> 16) & 0xff).toString(16).padStart(2, '0') +
+      ((word >>> 8) & 0xff).toString(16).padStart(2, '0') +
+      (word & 0xff).toString(16).padStart(2, '0');
   }
   return finalHash;
 }
@@ -168,6 +168,59 @@ export default function AccountScreen() {
   const [friendsList, setFriendsList] = useState<any[]>([]);
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
   const [isLoadingFriends, setIsLoadingFriends] = useState(false);
+
+  const [showNotifModal, setShowNotifModal] = useState(false);
+  const [notifVibePeak, setNotifVibePeak] = useState(true);
+  const [notifProximity, setNotifProximity] = useState(true);
+  const [notifSocial, setNotifSocial] = useState(true);
+
+  useEffect(() => {
+    const loadAndSyncSettings = async () => {
+      try {
+        const peak = await SecureStore.getItemAsync('notif_vibe_peak');
+        const prox = await SecureStore.getItemAsync('notif_proximity');
+        const soc = await SecureStore.getItemAsync('notif_social');
+        
+        if (peak !== null) setNotifVibePeak(peak !== 'false');
+        if (prox !== null) setNotifProximity(prox !== 'false');
+        if (soc !== null) setNotifSocial(soc !== 'false');
+      } catch (err) {
+        console.error('Failed to load notification settings:', err);
+      }
+
+      try {
+        const token = await SecureStore.getItemAsync('user_token');
+        if (!token) return;
+
+        const response = await fetch(`${API_URL}/api/auth/me`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json',
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.notifVibePeak !== undefined) {
+            setNotifVibePeak(data.notifVibePeak);
+            await SecureStore.setItemAsync('notif_vibe_peak', String(data.notifVibePeak));
+          }
+          if (data.notifProximity !== undefined) {
+            setNotifProximity(data.notifProximity);
+            await SecureStore.setItemAsync('notif_proximity', String(data.notifProximity));
+          }
+          if (data.notifSocial !== undefined) {
+            setNotifSocial(data.notifSocial);
+            await SecureStore.setItemAsync('notif_social', String(data.notifSocial));
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to sync settings from server (using offline cache):', err);
+      }
+    };
+    loadAndSyncSettings();
+  }, [user]);
 
   useEffect(() => {
     const fetchUserId = async () => {
@@ -547,7 +600,7 @@ export default function AccountScreen() {
       } else {
         const raw = await response.text();
         let payload: any = {};
-        try { payload = raw ? JSON.parse(raw) : {}; } catch {}
+        try { payload = raw ? JSON.parse(raw) : {}; } catch { }
         Alert.alert('Error', payload.message || 'Failed to send friend request.');
       }
     } catch (err) {
@@ -602,6 +655,39 @@ export default function AccountScreen() {
     }
   };
 
+  const handleToggleNotif = async (type: 'vibePeak' | 'proximity' | 'social', value: boolean) => {
+    if (type === 'vibePeak') {
+      setNotifVibePeak(value);
+      await SecureStore.setItemAsync('notif_vibe_peak', String(value));
+    } else if (type === 'proximity') {
+      setNotifProximity(value);
+      await SecureStore.setItemAsync('notif_proximity', String(value));
+    } else if (type === 'social') {
+      setNotifSocial(value);
+      await SecureStore.setItemAsync('notif_social', String(value));
+    }
+
+    try {
+      const token = await SecureStore.getItemAsync('user_token');
+      if (!token) return;
+
+      await fetch(`${API_URL}/api/auth/notification-settings`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          vibePeak: type === 'vibePeak' ? value : undefined,
+          proximity: type === 'proximity' ? value : undefined,
+          social: type === 'social' ? value : undefined,
+        })
+      });
+    } catch (err) {
+      console.error('Failed to update notification settings on server:', err);
+    }
+  };
+
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
@@ -649,7 +735,12 @@ export default function AccountScreen() {
             />
           }
         />
-        <AccountItem icon="notifications-none" label="Notifications" styles={styles} onPress={() => { }} />
+        <AccountItem 
+          icon="notifications-none" 
+          label="Notifications" 
+          styles={styles} 
+          onPress={() => setShowNotifModal(true)} 
+        />
       </View>
 
       <View style={styles.section}>
@@ -913,7 +1004,7 @@ export default function AccountScreen() {
           <View style={styles.modalContainer}>
             <Text style={styles.modalTitle}>Are you absolutely sure?</Text>
             <Text style={styles.modalMessage}>
-              This is your final warning. Once deleted, your account and location history are permanently erased and cannot be recovered.
+              Once deleted, your account and location history are permanently erased and cannot be recovered.
             </Text>
             <View style={styles.modalButtons}>
               <Pressable
@@ -1002,7 +1093,7 @@ export default function AccountScreen() {
             <Text style={[styles.modalMessage, { textAlign: 'center', marginBottom: 20 }]}>
               Show this QR code to a friend to let them scan and add you instantly on REVYND!
             </Text>
-            
+
             <View style={{
               padding: 24,
               backgroundColor: '#fff',
@@ -1024,7 +1115,7 @@ export default function AccountScreen() {
                 <ActivityIndicator size="large" color="#FB923C" />
               )}
             </View>
-            
+
             <View style={styles.modalButtons}>
               <Pressable
                 style={[styles.modalButton, { backgroundColor: '#FB923C', marginRight: 0 }]}
@@ -1052,13 +1143,13 @@ export default function AccountScreen() {
               barcodeTypes: ['qr'],
             }}
           />
-          
+
           <View style={styles.scannerOverlay}>
             <View style={styles.scannerOutline}>
               {scanning && <ActivityIndicator size="large" color="#FB923C" />}
             </View>
             <Text style={styles.scannerText}>Align QR code inside the box</Text>
-            
+
             <TouchableOpacity
               style={styles.scannerCloseButton}
               onPress={() => setShowScanner(false)}
@@ -1082,7 +1173,7 @@ export default function AccountScreen() {
             <Text style={styles.modalMessage}>
               Here are your phonebook contacts who are already on the app:
             </Text>
-            
+
             {isSyncingContacts ? (
               <View style={{ paddingVertical: 40, alignItems: 'center' }}>
                 <ActivityIndicator size="large" color="#FB923C" />
@@ -1131,7 +1222,7 @@ export default function AccountScreen() {
                 ))}
               </ScrollView>
             )}
-            
+
             <View style={[styles.modalButtons, { marginTop: 10 }]}>
               <Pressable
                 style={[styles.modalButton, { backgroundColor: '#FB923C', marginRight: 0 }]}
@@ -1154,7 +1245,7 @@ export default function AccountScreen() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContainer, { maxHeight: '80%' }]}>
             <Text style={styles.modalTitle}>Social Circle</Text>
-            
+
             <View style={styles.tabContainer}>
               <TouchableOpacity
                 style={[styles.tabButton, friendsActiveTab === 'friends' && styles.tabButtonActive]}
@@ -1246,6 +1337,74 @@ export default function AccountScreen() {
                 onPress={() => setShowFriendsModal(false)}
               >
                 <Text style={styles.modalDeleteText}>Close</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Notification Preferences Modal */}
+      <Modal
+        visible={showNotifModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowNotifModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>Notification Preferences</Text>
+            <Text style={styles.modalMessage}>
+              Choose which notifications you would like to receive.
+            </Text>
+
+            <View style={styles.switchRow}>
+              <View style={{ flex: 1, marginRight: 16 }}>
+                <Text style={styles.switchLabel}>Peak Vibe Alerts</Text>
+                <Text style={styles.switchSublabel}>Get notified when spots near you hit peak vibes</Text>
+              </View>
+              <Switch
+                value={notifVibePeak}
+                onValueChange={(val) => handleToggleNotif('vibePeak', val)}
+                trackColor={{ false: '#94A3B8', true: '#639cec' }}
+                thumbColor={notifVibePeak ? '#FB923C' : '#F4F3F4'}
+                ios_backgroundColor="#CBD5E1"
+              />
+            </View>
+
+            <View style={styles.switchRow}>
+              <View style={{ flex: 1, marginRight: 16 }}>
+                <Text style={styles.switchLabel}>Proximity Check-Ins</Text>
+                <Text style={styles.switchSublabel}>Remind me to check in when I'm near a spot</Text>
+              </View>
+              <Switch
+                value={notifProximity}
+                onValueChange={(val) => handleToggleNotif('proximity', val)}
+                trackColor={{ false: '#94A3B8', true: '#639cec' }}
+                thumbColor={notifProximity ? '#FB923C' : '#F4F3F4'}
+                ios_backgroundColor="#CBD5E1"
+              />
+            </View>
+
+            <View style={styles.switchRow}>
+              <View style={{ flex: 1, marginRight: 16 }}>
+                <Text style={styles.switchLabel}>Social Circle Alerts</Text>
+                <Text style={styles.switchSublabel}>Notify me of new friend requests and activity</Text>
+              </View>
+              <Switch
+                value={notifSocial}
+                onValueChange={(val) => handleToggleNotif('social', val)}
+                trackColor={{ false: '#94A3B8', true: '#639cec' }}
+                thumbColor={notifSocial ? '#FB923C' : '#F4F3F4'}
+                ios_backgroundColor="#CBD5E1"
+              />
+            </View>
+
+            <View style={[styles.modalButtons, { marginTop: 10 }]}>
+              <Pressable
+                style={[styles.modalButton, { backgroundColor: '#FB923C', marginRight: 0 }]}
+                onPress={() => setShowNotifModal(false)}
+              >
+                <Text style={styles.modalDeleteText}>Done</Text>
               </Pressable>
             </View>
           </View>
@@ -1507,5 +1666,25 @@ const makeStyles = (theme: AppTheme) => StyleSheet.create({
   },
   tabTextActive: {
     color: theme.text,
+  },
+  switchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.border,
+    marginBottom: 8,
+  },
+  switchLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: theme.text,
+  },
+  switchSublabel: {
+    fontSize: 12,
+    color: theme.subtext,
+    marginTop: 4,
+    lineHeight: 16,
   },
 });

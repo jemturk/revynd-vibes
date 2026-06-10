@@ -351,4 +351,23 @@ public class AuthService {
         entityManager.flush();
         logger.info("Device token and location updated for user ID: {}", user.getId());
     }
+
+    @Transactional
+    public void updateNotificationSettings(String email, Boolean vibePeak, Boolean proximity, Boolean social) {
+        logger.info("Updating notification settings for user email: {}", email);
+        User user = getUserByEmail(email);
+        if (vibePeak != null) {
+            user.setNotifVibePeak(vibePeak);
+        }
+        if (proximity != null) {
+            user.setNotifProximity(proximity);
+        }
+        if (social != null) {
+            user.setNotifSocial(social);
+        }
+        userRepository.save(user);
+        userRepository.flush();
+        entityManager.flush();
+        logger.info("Notification settings updated successfully for user ID: {}", user.getId());
+    }
 }
