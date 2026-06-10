@@ -13,7 +13,7 @@ jobs:
 
   submit_android:
     type: submit
-    needs: build_android
+    needs: [build_android]
     params:
-      platform: android
+      build_id: ${{ needs.build_android.outputs.build_id }}
       profile: production
