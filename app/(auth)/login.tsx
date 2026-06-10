@@ -68,9 +68,23 @@ export default function LoginScreen() {
     const validateForm = () => {
         setErrorMsg('');
 
-        // 1. Basic Presence Validation (with clean string trimming)
-        if (!email.trim() || !password || (isSignUp && (!name.trim() || !phoneNumber.trim()))) {
-            setErrorMsg('All fields are required.');
+        const trimmedEmail = email.trim();
+        const trimmedPassword = password.trim();
+
+        if (isSignUp) {
+            if (!name.trim()) {
+                setErrorMsg('Name is required.');
+                return false;
+            }
+        }
+
+        if (!trimmedEmail) {
+            setErrorMsg('Email Address is required.');
+            return false;
+        }
+
+        if (!trimmedPassword) {
+            setErrorMsg('Password is required.');
             return false;
         }
 
@@ -82,7 +96,7 @@ export default function LoginScreen() {
 
         // 3. Structural Email Validation Regex
         const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailPattern.test(email.trim())) {
+        if (!emailPattern.test(trimmedEmail)) {
             setErrorMsg('Please enter a valid email address.');
             return false;
         }
@@ -92,15 +106,15 @@ export default function LoginScreen() {
             const specialCharRegex = /[!@#$%^&*(),.?":{}|<>]/;
             const uppercaseRegex = /[A-Z]/;
 
-            if (password.length < 8) {
+            if (trimmedPassword.length < 8) {
                 setErrorMsg('Password must be at least 8 characters long.');
                 return false;
             }
-            if (!uppercaseRegex.test(password)) {
+            if (!uppercaseRegex.test(trimmedPassword)) {
                 setErrorMsg('Password must include at least one uppercase letter.');
                 return false;
             }
-            if (!specialCharRegex.test(password)) {
+            if (!specialCharRegex.test(trimmedPassword)) {
                 setErrorMsg('Password must include at least one special character (such as !@#$%^&*).');
                 return false;
             }
@@ -113,6 +127,7 @@ export default function LoginScreen() {
         if (!validateForm()) return;
 
         const normalizedEmail = email.trim().toLowerCase();
+        const normalizedPassword = password.trim();
         const endpoint = isSignUp ? '/api/auth/register' : '/api/auth/login';
 
         let referrerId: number | null = null;
@@ -143,8 +158,8 @@ export default function LoginScreen() {
                 body: JSON.stringify({
                     name: isSignUp ? name.trim() : undefined,
                     email: normalizedEmail,
-                    password: password,
-                    phoneNumber: isSignUp ? phoneNumber.trim() : undefined,
+                    password: normalizedPassword,
+                    phoneNumber: (isSignUp && phoneNumber.trim()) ? phoneNumber.trim() : undefined,
                     referrerId: isSignUp ? referrerId : undefined,
                 }),
             });
@@ -240,7 +255,7 @@ export default function LoginScreen() {
     const handleVerifyCode = async () => {
         setErrorMsg('');
         setSuccessMsg('');
-        
+
         if (!verificationCode.trim()) {
             setErrorMsg('Please enter the verification code.');
             return;
@@ -282,7 +297,7 @@ export default function LoginScreen() {
             if (data.id) {
                 await SecureStore.setItemAsync('userId', String(data.id));
             }
-            await SecureStore.deleteItemAsync('invite_referrer_id').catch(() => {});
+            await SecureStore.deleteItemAsync('invite_referrer_id').catch(() => { });
 
             signIn({
                 name: data.name || 'Rider',
@@ -399,7 +414,8 @@ export default function LoginScreen() {
             return;
         }
 
-        if (!newPassword) {
+        const trimmedNewPassword = newPassword.trim();
+        if (!trimmedNewPassword) {
             setErrorMsg('Please enter a new password.');
             return;
         }
@@ -408,15 +424,15 @@ export default function LoginScreen() {
         const specialCharRegex = /[!@#$%^&*(),.?\":{}|<>]/;
         const uppercaseRegex = /[A-Z]/;
 
-        if (newPassword.length < 8) {
+        if (trimmedNewPassword.length < 8) {
             setErrorMsg('Password must be at least 8 characters long.');
             return;
         }
-        if (!uppercaseRegex.test(newPassword)) {
+        if (!uppercaseRegex.test(trimmedNewPassword)) {
             setErrorMsg('Password must include at least one uppercase letter.');
             return;
         }
-        if (!specialCharRegex.test(newPassword)) {
+        if (!specialCharRegex.test(trimmedNewPassword)) {
             setErrorMsg('Password must include at least one special character (such as !@#$%^&*).');
             return;
         }
@@ -433,7 +449,7 @@ export default function LoginScreen() {
                 body: JSON.stringify({
                     email: verifyingEmail,
                     code: resetCode.trim(),
-                    password: newPassword,
+                    password: trimmedNewPassword,
                 }),
             });
 
@@ -890,7 +906,7 @@ const makeStyles = (theme) => StyleSheet.create({
     successText: { color: '#10B981', backgroundColor: theme.card, padding: 12, borderRadius: 8, marginBottom: 20, textAlign: 'center', fontWeight: '600', fontSize: 14 },
     input: { padding: 16, borderRadius: 12, marginBottom: 8, fontSize: 16, backgroundColor: theme.card, color: theme.text },
     passwordContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.card, borderRadius: 12, paddingHorizontal: 10, marginBottom: 8 },
-    passwordInput: { flex: 1, paddingVertical: 16, paddingRight: 8, color: theme.text },
+    passwordInput: { flex: 1, paddingVertical: 16, paddingRight: 8, color: theme.text, fontSize: 16 },
     eyeButton: { padding: 8 },
     mainButton: { backgroundColor: '#FB923C', padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 10 },
     mainButtonText: { color: '#fff', fontSize: 16, fontWeight: '700' },

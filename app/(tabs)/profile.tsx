@@ -1025,12 +1025,14 @@ export default function AccountScreen() {
               )}
             </View>
             
-            <Pressable
-              style={[styles.modalButton, { backgroundColor: '#FB923C', width: '100%' }]}
-              onPress={() => setShowQRCodeModal(false)}
-            >
-              <Text style={styles.modalDeleteText}>Close</Text>
-            </Pressable>
+            <View style={styles.modalButtons}>
+              <Pressable
+                style={[styles.modalButton, { backgroundColor: '#FB923C', marginRight: 0 }]}
+                onPress={() => setShowQRCodeModal(false)}
+              >
+                <Text style={styles.modalDeleteText}>Close</Text>
+              </Pressable>
+            </View>
           </View>
         </View>
       </Modal>
@@ -1130,12 +1132,14 @@ export default function AccountScreen() {
               </ScrollView>
             )}
             
-            <Pressable
-              style={[styles.modalButton, { backgroundColor: '#FB923C', marginTop: 10 }]}
-              onPress={() => setShowContactsModal(false)}
-            >
-              <Text style={styles.modalDeleteText}>Done</Text>
-            </Pressable>
+            <View style={[styles.modalButtons, { marginTop: 10 }]}>
+              <Pressable
+                style={[styles.modalButton, { backgroundColor: '#FB923C', marginRight: 0 }]}
+                onPress={() => setShowContactsModal(false)}
+              >
+                <Text style={styles.modalDeleteText}>Done</Text>
+              </Pressable>
+            </View>
           </View>
         </View>
       </Modal>
@@ -1236,12 +1240,14 @@ export default function AccountScreen() {
               )
             )}
 
-            <Pressable
-              style={[styles.modalButton, { backgroundColor: '#FB923C', marginTop: 10 }]}
-              onPress={() => setShowFriendsModal(false)}
-            >
-              <Text style={styles.modalDeleteText}>Close</Text>
-            </Pressable>
+            <View style={[styles.modalButtons, { marginTop: 10 }]}>
+              <Pressable
+                style={[styles.modalButton, { backgroundColor: '#FB923C', marginRight: 0 }]}
+                onPress={() => setShowFriendsModal(false)}
+              >
+                <Text style={styles.modalDeleteText}>Close</Text>
+              </Pressable>
+            </View>
           </View>
         </View>
       </Modal>
