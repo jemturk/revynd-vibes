@@ -30,10 +30,13 @@ export default {
         "backgroundColor": "#ffffff"
       },
       "permissions": [
-        "USE_BIOMETRIC",
         "ACCESS_COARSE_LOCATION", // 👈 Allows approximation mapping data cells
         "ACCESS_FINE_LOCATION",   // 👈 Allows high-fidelity GPS pin tracking
         "FOREGROUND_SERVICE"      // 👈 Required if tracking pins while screen is active
+      ],
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_WIFI_STATE"
       ]
     },
     "androidStatusBar": {
