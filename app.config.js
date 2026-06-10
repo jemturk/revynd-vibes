@@ -48,6 +48,7 @@ export default {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
+      "expo-font",
       "expo-router",
       "expo-secure-store",
       "expo-notifications",
