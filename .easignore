@@ -1,0 +1,25 @@
+# Ignore node_modules
+node_modules/
+
+# Ignore Expo and build folders
+.expo/
+dist/
+web-build/
+
+# Ignore generated native folders (since they are generated during build)
+/ios
+/android
+
+# Ignore local builds and large files
+*.apk
+*.aab
+*.tar.gz
+*.zip
+google-cloud-cli*
+
+# Ignore environment variables / secrets
+.env
+.env*.local
+
+# Ignore OS files
+.DS_Store
