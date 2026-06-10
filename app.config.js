@@ -21,9 +21,10 @@ export default {
       "bundleIdentifier": "com.jemturk.revynd"
     },
     "android": {
-      "package": "com.jemturk.revynd", // 👈 Consolidated your unique branding package name here
-      "versionCode": 1,                // 👈 Added version code for Google Play release tracking
-      "kotlinVersion": "1.9.24",       // 👈 Brought your custom kotlin engine target inside the bundle
+      "package": "com.jemturk.revynd",
+      "googleServicesFile": "./google-services.json",
+      "versionCode": 1,
+      "kotlinVersion": "1.9.24",
       "edgeToEdgeEnabled": false,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",

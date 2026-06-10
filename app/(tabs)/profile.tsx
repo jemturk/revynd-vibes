@@ -717,7 +717,7 @@ export default function AccountScreen() {
         />
         <AccountItem
           icon="contacts"
-          label="Find Friends (Contacts / Search)"
+          label="Find Friends from Contacts"
           styles={styles}
           onPress={handleSyncContacts}
         />
