@@ -23,7 +23,6 @@ export default {
     "android": {
       "package": "com.jemturk.revynd",
       "googleServicesFile": "./google-services.json",
-      "versionCode": 1,
       "kotlinVersion": "1.9.24",
       "edgeToEdgeEnabled": false,
       "adaptiveIcon": {

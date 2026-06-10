@@ -812,7 +812,7 @@ export default function LoginScreen() {
                         />
                         <TextInput
                             style={styles.input}
-                            placeholder="Phone Number"
+                            placeholder="Phone Number (Optional)"
                             placeholderTextColor={theme.subtext}
                             value={phoneNumber}
                             onChangeText={setPhoneNumber}
