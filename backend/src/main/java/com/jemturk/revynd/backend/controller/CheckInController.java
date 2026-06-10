@@ -2,6 +2,7 @@ package com.jemturk.revynd.backend.controller;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import com.jemturk.revynd.backend.service.ExpoPushNotificationService;
 
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -43,6 +44,9 @@ public class CheckInController {
     private final CheckInRepository checkInRepository;
     private final SpotRepository spotRepository;
     private final UserRepository userRepository;
+    private final ExpoPushNotificationService expoPushNotificationService;
+
+    private static final java.util.concurrent.ConcurrentHashMap<Long, LocalDateTime> lastPeakAlertTime = new java.util.concurrent.ConcurrentHashMap<>();
 
     @PostMapping("/{spotId}")
     public ResponseEntity<?> createCheckIn(@PathVariable Long spotId, Principal principal) {
@@ -201,6 +205,68 @@ public class CheckInController {
         spot.setVibe(mostCommonVibe);
         spotRepository.save(spot); // Update the spot with new vibe and intensity
 
+        // VIBE PEAK ALERT TRIGGER CHECK
+        double intensity = spot.getIntensity();
+        if (intensity >= 0.25) {
+            triggerVibePeakAlert(spot);
+        }
+
         return ResponseEntity.ok("Check-in successful");
+    }
+
+    private void triggerVibePeakAlert(Spot spot) {
+        Long spotId = spot.getId();
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime lastAlert = lastPeakAlertTime.get(spotId);
+        
+        // 1-hour cooldown per spot to prevent notification spamming
+        if (lastAlert != null && lastAlert.isAfter(now.minusHours(1))) {
+            return;
+        }
+        
+        lastPeakAlertTime.put(spotId, now);
+        
+        // Coordinates of the peaking spot
+        double spotLat = spot.getLocation().getY();
+        double spotLng = spot.getLocation().getX();
+        
+        // Bounding box for approximately 5 miles (0.0725 deg latitude, 0.0947 deg longitude)
+        double minLat = spotLat - 0.0725;
+        double maxLat = spotLat + 0.0725;
+        double minLng = spotLng - 0.0947;
+        double maxLng = spotLng + 0.0947;
+        
+        List<User> candidateUsers = userRepository.findUsersWithPushTokenInBoundingBox(minLat, maxLat, minLng, maxLng);
+        
+        for (User u : candidateUsers) {
+            if (u.getLastLatitude() == null || u.getLastLongitude() == null || u.getPushToken() == null) {
+                continue;
+            }
+            
+            // Haversine formula for exact 5-mile (8046.72 meters) circle verification
+            double distance = calculateDistanceInMeters(spotLat, spotLng, u.getLastLatitude(), u.getLastLongitude());
+            if (distance <= 8046.72) {
+                String title = "Vibe Peak Alert! 🔥";
+                String body = "The vibe at " + spot.getName() + " is peaking right now! (Intensity: " + String.format("%.0f%%", spot.getIntensity() * 100) + "). Check it out!";
+                Map<String, Object> data = Map.of(
+                    "spotId", String.valueOf(spot.getId()),
+                    "type", "vibe_peak"
+                );
+                
+                expoPushNotificationService.sendPushNotification(u.getPushToken(), title, body, data);
+            }
+        }
+    }
+    
+    // Helper method for Haversine distance in meters
+    private double calculateDistanceInMeters(double lat1, double lon1, double lat2, double lon2) {
+        double R = 6371000; // Earth's radius in meters
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLon = Math.toRadians(lon2 - lon1);
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                   Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
+                   Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
     }
 }

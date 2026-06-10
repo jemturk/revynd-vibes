@@ -317,4 +317,18 @@ public class AuthService {
 
         logger.info("✅ Password successfully reset and account verified for user ID: {}", user.getId());
     }
+
+    @Transactional
+    public void registerDevice(String email, String pushToken, Double latitude, Double longitude) {
+        logger.info("Registering device token and location for user email: {}", email);
+        User user = getUserByEmail(email);
+        user.setPushToken(pushToken);
+        user.setLastLatitude(latitude);
+        user.setLastLongitude(longitude);
+        
+        userRepository.save(user);
+        userRepository.flush();
+        entityManager.flush();
+        logger.info("Device token and location updated for user ID: {}", user.getId());
+    }
 }

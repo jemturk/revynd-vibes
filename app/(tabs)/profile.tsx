@@ -43,6 +43,7 @@ export default function AccountScreen() {
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showSecondDeleteModal, setShowSecondDeleteModal] = useState(false);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
   const [deleteErrorMessage, setDeleteErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -184,7 +185,7 @@ export default function AccountScreen() {
   };
 
   const confirmDeleteAccount = async () => {
-    setShowDeleteModal(false);
+    setShowSecondDeleteModal(false);
 
     if (!user?.email) {
       Alert.alert('Error', 'No signed-in account found.');
@@ -507,7 +508,7 @@ export default function AccountScreen() {
           <View style={styles.modalContainer}>
             <Text style={styles.modalTitle}>Delete account?</Text>
             <Text style={styles.modalMessage}>
-              This will permanently delete your account and all associated data. This action cannot be undone.
+              This will permanently delete your account and all associated data, including your check-in history. This action cannot be undone.
             </Text>
             <View style={styles.modalButtons}>
               <Pressable
@@ -518,9 +519,43 @@ export default function AccountScreen() {
               </Pressable>
               <Pressable
                 style={[styles.modalButton, styles.modalDeleteButton]}
-                onPress={confirmDeleteAccount}
+                onPress={() => {
+                  setShowDeleteModal(false);
+                  setShowSecondDeleteModal(true);
+                }}
               >
                 <Text style={styles.modalDeleteText}>Delete</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Account Deletion Secondary Confirmation Modal */}
+      <Modal
+        visible={showSecondDeleteModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowSecondDeleteModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>Are you absolutely sure?</Text>
+            <Text style={styles.modalMessage}>
+              This is your final warning. Once deleted, your account and location history are permanently erased and cannot be recovered.
+            </Text>
+            <View style={styles.modalButtons}>
+              <Pressable
+                style={[styles.modalButton, styles.modalCancelButton]}
+                onPress={() => setShowSecondDeleteModal(false)}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.modalButton, styles.modalDeleteButton]}
+                onPress={confirmDeleteAccount}
+              >
+                <Text style={styles.modalDeleteText}>Delete Permanently</Text>
               </Pressable>
             </View>
           </View>

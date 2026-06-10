@@ -204,6 +204,21 @@ public class AuthController {
                 .compact();
     }
 
+    @PostMapping("/register-device")
+    public ResponseEntity<?> registerDevice(@RequestBody Map<String, Object> body, Principal principal) {
+        if (principal == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "User is not authenticated."));
+        }
+        
+        String email = principal.getName();
+        String pushToken = (String) body.get("pushToken");
+        Double latitude = body.get("latitude") != null ? ((Number) body.get("latitude")).doubleValue() : null;
+        Double longitude = body.get("longitude") != null ? ((Number) body.get("longitude")).doubleValue() : null;
+        
+        authService.registerDevice(email, pushToken, latitude, longitude);
+        return ResponseEntity.ok(Map.of("message", "Device registered successfully"));
+    }
+
     /**
      * 🎯 CATCHES THE DUPLICATE USER EXCEPTIONS BEFORE SECURITY CAN HIJACK THE RESPONSE
      * This forces the backend to send a structured JSON error body alongside an HTTP 400 Bad Request status code.

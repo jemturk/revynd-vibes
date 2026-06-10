@@ -32,6 +32,15 @@ public class User {
     @Column(name = "profile_picture", columnDefinition = "TEXT")
     private String profilePicture;
 
+    @Column(name = "push_token")
+    private String pushToken;
+
+    @Column(name = "last_latitude")
+    private Double lastLatitude;
+
+    @Column(name = "last_longitude")
+    private Double lastLongitude;
+
     @Column(nullable = false)
     private boolean verified = false;
 
@@ -66,6 +75,13 @@ public class User {
     public void setPassword(String password) { this.password = password; }
     public String getProfilePicture() { return profilePicture; }
     public void setProfilePicture(String profilePicture) { this.profilePicture = profilePicture; }
+
+    public String getPushToken() { return pushToken; }
+    public void setPushToken(String pushToken) { this.pushToken = pushToken; }
+    public Double getLastLatitude() { return lastLatitude; }
+    public void setLastLatitude(Double lastLatitude) { this.lastLatitude = lastLatitude; }
+    public Double getLastLongitude() { return lastLongitude; }
+    public void setLastLongitude(Double lastLongitude) { this.lastLongitude = lastLongitude; }
 
     public boolean isVerified() { return verified; }
     public void setVerified(boolean verified) { this.verified = verified; }
