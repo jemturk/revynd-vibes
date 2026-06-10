@@ -9,95 +9,7 @@ import QRCode from 'react-native-qrcode-svg';
 import { CameraView, Camera } from 'expo-camera';
 import * as Contacts from 'expo-contacts';
 
-function sha256PureJS(ascii: string): string {
-  function rightRotate(value: number, amount: number) {
-    return (value >>> amount) | (value << (32 - amount));
-  }
-
-  const mathPow = Math.pow;
-  const maxWord = mathPow(2, 32);
-  const lengthProperty = 'length';
-  let i, j;
-
-  const words: number[] = [];
-  const asciiLength = ascii[lengthProperty];
-
-  const hash = sha256PureJS.h = sha256PureJS.h || [];
-  const k = sha256PureJS.k = sha256PureJS.k || [];
-  let primeCounter = k[lengthProperty];
-
-  const isComposite: { [key: number]: number } = {};
-  for (let candidate = 2; primeCounter < 64; candidate++) {
-    if (!isComposite[candidate]) {
-      for (i = 0; i < 313; i += candidate) {
-        isComposite[i] = 1;
-      }
-      hash[primeCounter] = (mathPow(candidate, .5) * maxWord) | 0;
-      k[primeCounter++] = (mathPow(candidate, 1 / 3) * maxWord) | 0;
-    }
-  }
-
-  const asciiBytes: number[] = [];
-  for (i = 0; i < asciiLength; i++) {
-    asciiBytes.push(ascii.charCodeAt(i));
-  }
-  asciiBytes.push(0x80);
-  while (asciiBytes[lengthProperty] % 64 !== 56) {
-    asciiBytes.push(0);
-  }
-  const bigEndianLength = asciiLength * 8;
-  for (i = 7; i >= 0; i--) {
-    asciiBytes.push((bigEndianLength >>> (i * 8)) & 0xff);
-  }
-
-  for (i = 0; i < asciiBytes[lengthProperty]; i += 4) {
-    words.push((asciiBytes[i] << 24) | (asciiBytes[i + 1] << 16) | (asciiBytes[i + 2] << 8) | asciiBytes[i + 3]);
-  }
-
-  const currentHash = hash.slice(0);
-  for (i = 0; i < words[lengthProperty]; i += 16) {
-    const w = words.slice(i, i + 16);
-    const oldHash = currentHash.slice(0);
-
-    for (j = 0; j < 64; j++) {
-      if (j >= 16) {
-        const s0 = rightRotate(w[j - 15], 7) ^ rightRotate(w[j - 15], 18) ^ (w[j - 15] >>> 3);
-        const s1 = rightRotate(w[j - 2], 17) ^ rightRotate(w[j - 2], 19) ^ (w[j - 2] >>> 10);
-        w[j] = (w[j - 16] + s0 + w[j - 7] + s1) | 0;
-      }
-
-      const t1 = (currentHash[7] + (rightRotate(currentHash[4], 6) ^ rightRotate(currentHash[4], 11) ^ rightRotate(currentHash[4], 25)) +
-        ((currentHash[4] & currentHash[5]) ^ (~currentHash[4] & currentHash[6])) + k[j] + w[j]) | 0;
-      const t2 = ((rightRotate(currentHash[0], 2) ^ rightRotate(currentHash[0], 13) ^ rightRotate(currentHash[0], 22)) +
-        ((currentHash[0] & currentHash[1]) ^ (currentHash[0] & currentHash[2]) ^ (currentHash[1] & currentHash[2]))) | 0;
-
-      currentHash[7] = currentHash[6];
-      currentHash[6] = currentHash[5];
-      currentHash[5] = currentHash[4];
-      currentHash[4] = (currentHash[3] + t1) | 0;
-      currentHash[3] = currentHash[2];
-      currentHash[2] = currentHash[1];
-      currentHash[1] = currentHash[0];
-      currentHash[0] = (t1 + t2) | 0;
-    }
-
-    for (j = 0; j < 8; j++) {
-      currentHash[j] = (currentHash[j] + oldHash[j]) | 0;
-    }
-  }
-
-  let finalHash = '';
-  for (i = 0; i < 8; i++) {
-    const word = currentHash[i];
-    finalHash += ((word >>> 24) & 0xff).toString(16).padStart(2, '0') +
-      ((word >>> 16) & 0xff).toString(16).padStart(2, '0') +
-      ((word >>> 8) & 0xff).toString(16).padStart(2, '0') +
-      (word & 0xff).toString(16).padStart(2, '0');
-  }
-  return finalHash;
-}
-sha256PureJS.h = null as number[] | null;
-sha256PureJS.k = null as number[] | null;
+import * as Crypto from 'expo-crypto';
 
 type AccountItemProps = {
   icon: React.ComponentProps<typeof MaterialIcons>['name'];
@@ -545,12 +457,15 @@ export default function AccountScreen() {
         fields: [Contacts.Fields.Emails, Contacts.Fields.PhoneNumbers],
       });
 
-      const hashes: string[] = [];
+      const hashPromises: Promise<string>[] = [];
       for (const contact of data) {
         if (contact.emails) {
           for (const e of contact.emails) {
             if (e.email) {
-              hashes.push(sha256PureJS(e.email.trim().toLowerCase()));
+              const cleanEmail = e.email.trim().toLowerCase();
+              hashPromises.push(
+                Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, cleanEmail)
+              );
             }
           }
         }
@@ -559,17 +474,21 @@ export default function AccountScreen() {
             if (p.number) {
               const cleanPhone = p.number.replace(/\D/g, '');
               if (cleanPhone) {
-                hashes.push(sha256PureJS(cleanPhone));
+                hashPromises.push(
+                  Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, cleanPhone)
+                );
               }
             }
           }
         }
       }
 
-      if (hashes.length === 0) {
+      if (hashPromises.length === 0) {
         setIsSyncingContacts(false);
         return;
       }
+
+      const hashes = await Promise.all(hashPromises);
 
       const response = await fetch(`${API_URL}/api/friends/sync`, {
         method: 'POST',

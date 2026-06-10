@@ -804,7 +804,7 @@ export default function LoginScreen() {
                     <>
                         <TextInput
                             style={styles.input}
-                            placeholder="Full Name"
+                            placeholder="Preferred Name"
                             placeholderTextColor={theme.subtext}
                             value={name}
                             onChangeText={setName}
