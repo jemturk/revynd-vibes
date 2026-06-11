@@ -1,4 +1,4 @@
-import { Tabs } from 'expo-router';
+import { Tabs, router } from 'expo-router';
 import { useTheme } from '../../theme/ThemeContext';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Image, Platform } from 'react-native';
@@ -226,9 +226,22 @@ export default function TabLayout() {
     // Listen for notification responses (clicks)
     const subscription = Notifications.addNotificationResponseReceivedListener(response => {
       const data = response.notification.request.content.data;
-      const spotId = data?.spotId;
-      if (spotId) {
-        console.log('User clicked notification for spot ID:', spotId);
+      console.log('Notification clicked with data:', data);
+
+      const type = data?.type;
+      if (type === 'friend_request' || type === 'friend_accepted') {
+        router.push('/(tabs)/profile?openModal=friends&tab=pending');
+      } else if (type === 'vibe_peak') {
+        const spotId = data?.spotId;
+        if (spotId) {
+          router.push(`/spot/${spotId}`);
+        }
+      } else {
+        // Fallback for spotId if type isn't set but spotId is present
+        const spotId = data?.spotId;
+        if (spotId) {
+          router.push(`/spot/${spotId}`);
+        }
       }
     });
 

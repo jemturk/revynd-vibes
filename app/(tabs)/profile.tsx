@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Modal, Pressable, Alert, Image, ActivityIndicator, TextInput, Linking, Share } from 'react-native';
+import { useLocalSearchParams, router } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme, AppTheme } from '../../theme/ThemeContext';
 import { useAuth } from '../_layout';
@@ -43,6 +44,7 @@ const AccountItem = ({ icon, label, onPress, rightElement, destructive, color, s
 export default function AccountScreen() {
   const { theme, isDark, toggleTheme } = useTheme();
   const { user, signIn, signOut } = useAuth();
+  const params = useLocalSearchParams();
 
   // FIXED: Wrapped stylesheet creation inside useMemo to completely eliminate layout regeneration overhead
   const styles = useMemo(() => makeStyles(theme), [theme]);
@@ -589,6 +591,20 @@ export default function AccountScreen() {
     setShowFriendsModal(true);
     await refreshFriendsData();
   };
+
+  useEffect(() => {
+    if (params.openModal === 'friends') {
+      setShowFriendsModal(true);
+      if (params.tab === 'pending') {
+        setFriendsActiveTab('pending');
+      } else {
+        setFriendsActiveTab('friends');
+      }
+      refreshFriendsData();
+      // Clear parameters so the modal doesn't reopen on subsequent visits
+      router.replace('/(tabs)/profile');
+    }
+  }, [params.openModal, params.tab]);
 
   const handleAcceptFriendRequest = async (requestId: number) => {
     try {
