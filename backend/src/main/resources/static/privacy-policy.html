@@ -123,7 +123,7 @@
 
         <div class="card">
             <h1>Privacy Policy</h1>
-            <p class="last-updated">Last Updated: June 9, 2026</p>
+            <p class="last-updated">Last Updated: June 11, 2026</p>
             <p>
                 Revynd ("we", "our", or "us") operates the Revynd mobile application. 
                 We are committed to protecting your privacy and providing a safe, transparent user experience. 
@@ -146,6 +146,15 @@
             <li>
                 <span class="highlight">Check-In Records:</span> When you perform a check-in, we save the spot ID, your selected vibe tag, the time, and the current crowd intensity. This aggregated activity updates the real-time vibe density map.
             </li>
+            <li>
+                <span class="highlight">Contacts (Hashed):</span> If you use the "Find Friends from Contacts" feature, we access the email addresses and phone numbers in your device's address book. This information is cryptographically hashed client-side (using the SHA-256 algorithm) before being transmitted to our servers. We check these hashes against our database to identify matching accounts. We do not store your raw or hashed contacts on our servers after the matching process is completed.
+            </li>
+            <li>
+                <span class="highlight">Camera Access:</span> If you use the "Scan QR Code" feature to add friends, we request access to your device's camera. Camera data is processed locally on your device in real-time solely to decode the QR code and is never collected, stored, or transmitted to our servers.
+            </li>
+            <li>
+                <span class="highlight">Friend and Connection Data:</span> We collect and store information about your connections on the platform, including your list of friends, pending friend requests, and invite referral relationships, to enable the app's social features.
+            </li>
         </ul>
 
         <h2>2. How We Use Your Information</h2>
@@ -155,6 +164,8 @@
             <li>To display nearby recreational areas and coordinates on your local map.</li>
             <li>To aggregate crowd activity at specific locations (without revealing your individual coordinates to other users).</li>
             <li>To enforce spam protection rules (e.g., restricting check-ins to once per hour).</li>
+            <li>To compare hashed contact data against our user base to help you discover friends who are also using Revynd.</li>
+            <li>To facilitate social interactions, such as managing your friends list and pending requests, and processing invite referrals.</li>
         </ul>
 
         <h2>3. Data Sharing and Third Parties</h2>
@@ -180,7 +191,7 @@
                 <span class="highlight">Self-Service Deletion:</span> You can permanently delete your account and all associated history at any time by navigating to the <span class="highlight">Profile</span> tab within the app and selecting <span class="highlight">Delete Account</span>.
             </li>
             <li>
-                <span class="highlight">Immediate Removal:</span> Upon account deletion, your profile record, email address, profile picture, and entire check-in history are <span class="highlight">permanently deleted</span> from our active databases.
+                <span class="highlight">Immediate Removal:</span> Upon account deletion, your profile record, email address, profile picture, friend connections, and entire check-in history are <span class="highlight">permanently deleted</span> from our active databases.
             </li>
         </ul>
 
