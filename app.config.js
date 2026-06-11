@@ -76,7 +76,15 @@ export default {
         {
           "cameraPermission": "Allow Revynd to scan friend QR codes."
         }
-      ]
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableMinifyInReleaseBuilds": true
+          }
+        }
+      ],
     ],
     "extra": {
       "mapboxPublicToken": process.env.MAPBOX_PUBLIC_TOKEN,
