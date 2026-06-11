@@ -9,6 +9,10 @@ export default {
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
+    "notification": {
+      "icon": "./assets/notification-icon.png",
+      "color": "#FB923C"
+    },
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
