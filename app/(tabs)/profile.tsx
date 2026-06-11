@@ -368,7 +368,7 @@ export default function AccountScreen() {
       return;
     }
     try {
-      const inviteUrl = `revynd://invite?referrerId=${userId}`;
+      const inviteUrl = `${API_URL}/invite.html?referrerId=${userId}`;
       const message = `Join me on REVYND to check real-time vibes and see check-ins! Register using my invite link:\n${inviteUrl}`;
       await Share.share({
         message,
@@ -1089,7 +1089,7 @@ export default function AccountScreen() {
             }}>
               {userId ? (
                 <QRCode
-                  value={`revynd://invite?referrerId=${userId}`}
+                  value={`${API_URL}/invite.html?referrerId=${userId}`}
                   size={180}
                   color="#1E293B"
                   backgroundColor="#FFFFFF"
