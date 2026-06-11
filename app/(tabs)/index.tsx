@@ -420,7 +420,7 @@ export default function MapScreen() {
     const updateCooldown = () => {
       const elapsed = Date.now() - lastCheckInTime;
       // const remaining = Math.max(0, Math.ceil((60000 - elapsed) / 1000));
-      const remaining = Math.max(0, Math.ceil((5000 - elapsed) / 1000));
+      const remaining = Math.max(0, Math.ceil((3000 - elapsed) / 1000));
       setCooldownRemaining(remaining);
       return remaining;
     };
