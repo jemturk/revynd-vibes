@@ -607,6 +607,37 @@ export default function AccountScreen() {
     }
   };
 
+  const handleRemoveFriend = async (friendId: number | string, friendName: string) => {
+    Alert.alert(
+      'Remove Friend',
+      `Are you sure you want to remove ${friendName} from your friends list?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const response = await fetch(`${API_URL}/api/friends/remove/${friendId}`, {
+                method: 'DELETE',
+                headers: await buildAuthHeaders('application/json'),
+              });
+              if (response.ok) {
+                await refreshFriendsData();
+                setSuccessMessage(`${friendName} removed.`);
+              } else {
+                Alert.alert('Error', 'Failed to remove friend.');
+              }
+            } catch (err) {
+              console.error('Remove friend error:', err);
+              Alert.alert('Error', 'An unexpected error occurred.');
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const handleToggleNotif = async (type: 'vibePeak' | 'proximity' | 'social', value: boolean) => {
     if (type === 'vibePeak') {
       setNotifVibePeak(value);
@@ -1248,6 +1279,12 @@ export default function AccountScreen() {
                         <Text style={styles.friendName}>{friend.name}</Text>
                         <Text style={styles.friendSub}>{friend.email}</Text>
                       </View>
+                      <TouchableOpacity
+                        style={[styles.addFriendBtn, { backgroundColor: '#EF4444' }]}
+                        onPress={() => handleRemoveFriend(friend.id, friend.name)}
+                      >
+                        <Text style={styles.addFriendBtnText}>Remove</Text>
+                      </TouchableOpacity>
                     </View>
                   ))}
                 </ScrollView>

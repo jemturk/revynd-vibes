@@ -94,6 +94,23 @@ public class FriendshipController {
         return ResponseEntity.ok(Map.of("message", "Friend request accepted successfully"));
     }
 
+    @DeleteMapping("/remove/{targetUserId}")
+    @Transactional
+    public ResponseEntity<?> removeFriend(@PathVariable Long targetUserId, Principal principal) {
+        String email = principal.getName();
+        User currentUser = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        Optional<Friendship> friendshipOpt = friendshipRepository.findAnyRelationship(currentUser.getId(), targetUserId);
+        if (friendshipOpt.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "No friendship relationship exists with this user."));
+        }
+
+        friendshipRepository.delete(friendshipOpt.get());
+
+        return ResponseEntity.ok(Map.of("message", "Friend removed successfully"));
+    }
+
     @GetMapping
     public ResponseEntity<?> getFriends(Principal principal) {
         String email = principal.getName();
