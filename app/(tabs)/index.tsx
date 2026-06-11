@@ -419,7 +419,8 @@ export default function MapScreen() {
 
     const updateCooldown = () => {
       const elapsed = Date.now() - lastCheckInTime;
-      const remaining = Math.max(0, Math.ceil((60000 - elapsed) / 1000));
+      // const remaining = Math.max(0, Math.ceil((60000 - elapsed) / 1000));
+      const remaining = Math.max(0, Math.ceil((5000 - elapsed) / 1000));
       setCooldownRemaining(remaining);
       return remaining;
     };
@@ -662,12 +663,12 @@ export default function MapScreen() {
           onCameraChanged={(e: any) => {
             if (e?.properties?.center) {
               const center = e.properties.center as [number, number];
-              
+
               // Clear any existing timeout
               if (fetchTimeoutRef.current) {
                 clearTimeout(fetchTimeoutRef.current);
               }
-              
+
               // Set a new timeout to debounce the fetch
               fetchTimeoutRef.current = setTimeout(() => {
                 fetchSpots(center);
@@ -789,25 +790,25 @@ export default function MapScreen() {
           animationType="fade"
           onRequestClose={() => setShowFilterModal(false)}
         >
-          <TouchableOpacity 
+          <TouchableOpacity
             style={{ flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.7)', justifyContent: 'center', alignItems: 'center', padding: 20 }}
             activeOpacity={1}
             onPress={() => setShowFilterModal(false)}
           >
-            <TouchableOpacity 
+            <TouchableOpacity
               activeOpacity={1}
               style={{ width: '100%', maxWidth: 420, backgroundColor: theme.card, borderRadius: 22, padding: 24, alignItems: 'center', elevation: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.18, shadowRadius: 20 }}
             >
               <Text style={{ fontSize: 20, fontWeight: '700', color: theme.text, marginBottom: 20 }}>Filter by Category</Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 10 }}>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={{ backgroundColor: selectedCategoryFilter === null ? theme.primary : theme.background, paddingVertical: 10, paddingHorizontal: 20, borderRadius: 20, borderWidth: 1, borderColor: selectedCategoryFilter === null ? theme.primary : theme.border }}
                   onPress={() => { setSelectedCategoryFilter(null); setShowFilterModal(false); }}
                 >
                   <Text style={{ color: selectedCategoryFilter === null ? '#fff' : theme.text, fontWeight: '600', fontSize: 15 }}>All</Text>
                 </TouchableOpacity>
                 {ALL_CATEGORIES.map(cat => (
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     key={cat}
                     style={{ backgroundColor: selectedCategoryFilter === cat ? theme.primary : theme.background, paddingVertical: 10, paddingHorizontal: 20, borderRadius: 20, borderWidth: 1, borderColor: selectedCategoryFilter === cat ? theme.primary : theme.border }}
                     onPress={() => { setSelectedCategoryFilter(cat); setShowFilterModal(false); }}
@@ -816,7 +817,7 @@ export default function MapScreen() {
                   </TouchableOpacity>
                 ))}
               </View>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={{ marginTop: 25, paddingVertical: 12, paddingHorizontal: 30, backgroundColor: theme.background, borderRadius: 14, borderWidth: 1, borderColor: theme.border }}
                 onPress={() => setShowFilterModal(false)}
               >
@@ -917,8 +918,8 @@ export default function MapScreen() {
                             </TouchableOpacity>
                           ))}
                         </View>
-                        <TouchableOpacity 
-                          style={{ marginTop: 15, padding: 10 }} 
+                        <TouchableOpacity
+                          style={{ marginTop: 15, padding: 10 }}
                           onPress={() => {
                             setShowVibeSelection(false);
                             bottomSheetRef.current?.snapToIndex(1);
@@ -931,7 +932,7 @@ export default function MapScreen() {
                       <TouchableOpacity
                         style={[
                           styles.checkInButton,
-                          cooldownRemaining > 0 && { 
+                          cooldownRemaining > 0 && {
                             backgroundColor: isDark ? 'rgba(13, 148, 136, 0.15)' : 'rgba(13, 148, 136, 0.12)',
                             elevation: 0,
                             shadowOpacity: 0
@@ -944,7 +945,7 @@ export default function MapScreen() {
                         }}
                       >
                         <Text style={[
-                          styles.buttonText, 
+                          styles.buttonText,
                           cooldownRemaining > 0 && { color: isDark ? 'rgba(45, 212, 191, 0.6)' : 'rgba(13, 148, 136, 0.6)' }
                         ]}>
                           {cooldownRemaining > 0 ? `Vibe Boosted (${cooldownRemaining}s)` : 'Check In'}
