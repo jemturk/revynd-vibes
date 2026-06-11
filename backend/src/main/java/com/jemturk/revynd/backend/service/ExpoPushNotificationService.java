@@ -17,7 +17,7 @@ public class ExpoPushNotificationService {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public void sendPushNotification(String pushToken, String title, String body, Map<String, Object> data) {
-        if (pushToken == null || !pushToken.startsWith("ExponentPushToken")) {
+        if (pushToken == null || (!pushToken.startsWith("ExponentPushToken") && !pushToken.startsWith("ExpoPushToken"))) {
             logger.warn("Invalid push token format: {}", pushToken);
             return;
         }
