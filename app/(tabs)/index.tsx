@@ -11,6 +11,7 @@ import * as SecureStore from 'expo-secure-store';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../../theme/ThemeContext';
+import { useLocalSearchParams, router } from 'expo-router';
 
 const VIBE_TAGS_BY_CATEGORY: Record<string, string[]> = {
   'Cafe': ['Cozy', 'Packed', 'Great for working', 'Loud'],
@@ -52,6 +53,7 @@ const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => 
 
 export default function MapScreen() {
   const { theme, isDark } = useTheme();
+  const params = useLocalSearchParams();
 
   const cameraRef = useRef<Mapbox.Camera>(null);
   const bottomSheetRef = useRef<BottomSheet>(null);
@@ -71,6 +73,7 @@ export default function MapScreen() {
   const [alertConfig, setAlertConfig] = useState<{ msg: string; type: 'error' | 'warning' | 'success' | null }>({ msg: '', type: null });
   const slideAnim = useRef(new Animated.Value(-100)).current; // Start off-screen
   const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const fetchingSpotIdRef = useRef<string | null>(null);
 
   const [lastCheckIns, setLastCheckIns] = useState<Record<string, number>>({});
   const [cooldownRemaining, setCooldownRemaining] = useState<number>(0);
@@ -270,13 +273,7 @@ export default function MapScreen() {
     }, 3000);
   };
 
-  const [featureCollection, setFeatureCollection] = useState<FeatureCollection<Point, {
-    id: string;
-    name: string;
-    vibe: string;
-    category: string;
-    intensity: number;
-  }>>({
+  const [featureCollection, setFeatureCollection] = useState<FeatureCollection<Point, SpotFeature['properties']>>({
     type: 'FeatureCollection',
     features: [],
   });
@@ -315,9 +312,14 @@ export default function MapScreen() {
         },
       }));
 
-      setFeatureCollection({
-        type: 'FeatureCollection',
-        features: features,
+      setFeatureCollection(prev => {
+        const keepSelected = selectedSpot && !features.some(f => String(f.properties.id) === String(selectedSpot.properties.id))
+          ? [selectedSpot]
+          : [];
+        return {
+          type: 'FeatureCollection',
+          features: [...features, ...keepSelected],
+        };
       });
     } catch (error) {
       console.error("Backend fetch failed:", error);
@@ -343,6 +345,63 @@ export default function MapScreen() {
     };
     loadCheckIns();
   }, []);
+
+  useEffect(() => {
+    if (params.selectedSpotId) {
+      const existingSpot = featureCollection.features.find(
+        f => String(f.properties.id) === String(params.selectedSpotId)
+      );
+      if (existingSpot) {
+        setSelectedSpot(existingSpot);
+        bottomSheetRef.current?.snapToIndex(1);
+        cameraRef.current?.flyTo(existingSpot.geometry.coordinates, 800);
+        router.replace('/(tabs)/');
+      } else {
+        if (fetchingSpotIdRef.current === String(params.selectedSpotId)) return;
+        fetchingSpotIdRef.current = String(params.selectedSpotId);
+
+        const fetchSpotAndFocus = async () => {
+          try {
+            const headers = await buildAuthHeaders();
+            const res = await fetch(`${API_URL}/api/spots/${params.selectedSpotId}`, { headers });
+            if (res.ok) {
+              const spot = await res.json();
+              const feature: SpotFeature = {
+                type: 'Feature',
+                properties: {
+                  id: spot.id,
+                  name: spot.name,
+                  vibe: spot.vibe,
+                  category: spot.category,
+                  intensity: spot.intensity,
+                  isSaved: spot.saved,
+                },
+                geometry: {
+                  type: 'Point',
+                  coordinates: [spot.location[0], spot.location[1]],
+                },
+              };
+              setFeatureCollection(prev => ({
+                ...prev,
+                features: prev.features.some(f => String(f.properties.id) === String(feature.properties.id))
+                  ? prev.features
+                  : [...prev.features, feature]
+              }));
+              setSelectedSpot(feature);
+              bottomSheetRef.current?.snapToIndex(1);
+              cameraRef.current?.flyTo(feature.geometry.coordinates, 800);
+              router.replace('/(tabs)/');
+            }
+          } catch (err) {
+            console.error('Failed to fetch and select spot:', err);
+          } finally {
+            fetchingSpotIdRef.current = null;
+          }
+        };
+        fetchSpotAndFocus();
+      }
+    }
+  }, [params.selectedSpotId, featureCollection]);
 
   useEffect(() => {
     if (!selectedSpot) {

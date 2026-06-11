@@ -82,4 +82,23 @@ public class SpotController {
                     intensity);
         }).collect(Collectors.toList());
     }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<?> getSpotById(@PathVariable Long id) {
+        return spotRepository.findById(id)
+                .map(spot -> {
+                    LocalDateTime oneHourAgo = LocalDateTime.now().minusHours(1);
+                    int count = checkInRepository.findBySpotIdAndCheckInTimeAfter(id, oneHourAgo).size();
+                    double intensity = Math.min(1.0, count * 0.05);
+
+                    return ResponseEntity.ok(new SpotRecord(
+                            spot.getId(),
+                            spot.getName(),
+                            spot.getVibe(),
+                            spot.getCategory(),
+                            spot.getLocation(),
+                            intensity));
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
 }

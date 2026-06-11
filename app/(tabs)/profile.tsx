@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Modal, Pressable, Alert, Image, ActivityIndicator, TextInput, Linking, Share } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -87,6 +87,27 @@ export default function AccountScreen() {
   const [friendsList, setFriendsList] = useState<any[]>([]);
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
   const [isLoadingFriends, setIsLoadingFriends] = useState(false);
+
+  // Remove confirmation states
+  const [confirmingFriendId, setConfirmingFriendId] = useState<number | string | null>(null);
+  const [confirmCountdown, setConfirmCountdown] = useState<number>(0);
+  const confirmIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  const clearConfirmTimer = () => {
+    if (confirmIntervalRef.current) {
+      clearInterval(confirmIntervalRef.current);
+      confirmIntervalRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    if (!showFriendsModal) {
+      setConfirmingFriendId(null);
+      setConfirmCountdown(0);
+      clearConfirmTimer();
+    }
+    return () => clearConfirmTimer();
+  }, [showFriendsModal]);
 
   const [showNotifModal, setShowNotifModal] = useState(false);
   const [notifVibePeak, setNotifVibePeak] = useState(true);
@@ -624,34 +645,44 @@ export default function AccountScreen() {
   };
 
   const handleRemoveFriend = async (friendId: number | string, friendName: string) => {
-    Alert.alert(
-      'Remove Friend',
-      `Are you sure you want to remove ${friendName} from your friends list?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const response = await fetch(`${API_URL}/api/friends/remove/${friendId}`, {
-                method: 'DELETE',
-                headers: await buildAuthHeaders('application/json'),
-              });
-              if (response.ok) {
-                await refreshFriendsData();
-                setSuccessMessage(`${friendName} removed.`);
-              } else {
-                Alert.alert('Error', 'Failed to remove friend.');
-              }
-            } catch (err) {
-              console.error('Remove friend error:', err);
-              Alert.alert('Error', 'An unexpected error occurred.');
-            }
-          }
+    // If we are already confirming this friend and the countdown is 0, execute removal!
+    if (confirmingFriendId === friendId && confirmCountdown === 0) {
+      try {
+        const response = await fetch(`${API_URL}/api/friends/remove/${friendId}`, {
+          method: 'DELETE',
+          headers: await buildAuthHeaders('application/json'),
+        });
+        if (response.ok) {
+          await refreshFriendsData();
+          setSuccessMessage(`${friendName} removed.`);
+        } else {
+          Alert.alert('Error', 'Failed to remove friend.');
         }
-      ]
-    );
+      } catch (err) {
+        console.error('Remove friend error:', err);
+        Alert.alert('Error', 'An unexpected error occurred.');
+      } finally {
+        setConfirmingFriendId(null);
+        setConfirmCountdown(0);
+        clearConfirmTimer();
+      }
+    } else {
+      // First click: start confirmation countdown
+      clearConfirmTimer();
+      setConfirmingFriendId(friendId);
+      setConfirmCountdown(3);
+
+      const interval = setInterval(() => {
+        setConfirmCountdown(prev => {
+          if (prev <= 1) {
+            clearInterval(interval);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      confirmIntervalRef.current = interval;
+    }
   };
 
   const handleToggleNotif = async (type: 'vibePeak' | 'proximity' | 'social', value: boolean) => {
@@ -1295,12 +1326,25 @@ export default function AccountScreen() {
                         <Text style={styles.friendName}>{friend.name}</Text>
                         <Text style={styles.friendSub}>{friend.email}</Text>
                       </View>
-                      <TouchableOpacity
-                        style={[styles.addFriendBtn, { backgroundColor: '#EF4444' }]}
-                        onPress={() => handleRemoveFriend(friend.id, friend.name)}
-                      >
-                        <Text style={styles.addFriendBtnText}>Remove</Text>
-                      </TouchableOpacity>
+                      {(() => {
+                        const isConfirmingThis = confirmingFriendId === friend.id;
+                        const isTimerActive = isConfirmingThis && confirmCountdown > 0;
+                        const btnText = isConfirmingThis
+                          ? (isTimerActive ? `Are you sure? (${confirmCountdown}s)` : "Are you sure?")
+                          : "Remove";
+                        const btnBgColor = isTimerActive ? '#FCA5A5' : '#EF4444'; // Lighter red if countdown active
+
+                        return (
+                          <TouchableOpacity
+                            style={[styles.addFriendBtn, { backgroundColor: btnBgColor }]}
+                            onPress={() => handleRemoveFriend(friend.id, friend.name)}
+                            disabled={isTimerActive}
+                            activeOpacity={isTimerActive ? 1 : 0.7}
+                          >
+                            <Text style={styles.addFriendBtnText}>{btnText}</Text>
+                          </TouchableOpacity>
+                        );
+                      })()}
                     </View>
                   ))}
                 </ScrollView>

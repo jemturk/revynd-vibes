@@ -234,13 +234,13 @@ export default function TabLayout() {
       } else if (type === 'vibe_peak') {
         const spotId = data?.spotId;
         if (spotId) {
-          router.push(`/spot/${spotId}`);
+          router.push(`/(tabs)/?selectedSpotId=${spotId}`);
         }
       } else {
-        // Fallback for spotId if type isn't set but spotId is present
+        // Fallback for spotId if type isn't set but spotId is present (like local proximity alerts)
         const spotId = data?.spotId;
         if (spotId) {
-          router.push(`/spot/${spotId}`);
+          router.push(`/(tabs)/?selectedSpotId=${spotId}`);
         }
       }
     });
