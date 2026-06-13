@@ -55,6 +55,7 @@ const HistoryScreen = () => {
       backgroundColor: theme.card,
       borderBottomWidth: 1,
       borderBottomColor: theme.border,
+      marginBottom: 20,
     },
     headerTop: {
       flexDirection: 'row',
@@ -115,7 +116,7 @@ const HistoryScreen = () => {
       color: theme.text,
       fontWeight: '700',
     },
-    listContent: { paddingHorizontal: 5, paddingVertical: 20, paddingBottom: 120 },
+    listContent: { paddingBottom: 120 },
     historyCard: {
       backgroundColor: theme.card,
       borderRadius: 20,
@@ -167,7 +168,7 @@ const HistoryScreen = () => {
     emptyText: { color: theme.subtext, marginTop: 12, fontSize: 16, fontWeight: '500' },
     itemWrapper: {
       marginBottom: 12,
-      marginHorizontal: 16,
+      marginHorizontal: 21,
     },
     shadowWrapper: {
       shadowColor: theme.text,
@@ -693,61 +694,62 @@ const HistoryScreen = () => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <Text style={styles.headerTitle}>Visited Spots 🛹</Text>
-          <TouchableOpacity
-            style={styles.selectButton}
-            onPress={() => setIsSelectMode(!isSelectMode)}
-          >
-            <Text style={styles.selectButtonText}>
-              {isSelectMode ? 'Cancel' : 'Select'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {isSelectMode ? (
-          <View style={styles.batchHeaderActions}>
-            <TouchableOpacity onPress={handleSelectAll}>
-              <Text style={styles.batchActionLink}>
-                {selectedIds.size === history.length ? 'Deselect All' : 'Select All'}
-              </Text>
-            </TouchableOpacity>
-            <Text style={styles.headerSubtitle}>
-              {selectedIds.size} selected
-            </Text>
-          </View>
-        ) : (
-          <Text style={styles.headerSubtitle}>
-            {history.length} check-ins total
-          </Text>
-        )}
-
-        <View style={styles.tabsContainer}>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'active' && styles.activeTab]}
-            onPress={() => handleTabChange('active')}
-          >
-            <Text style={[styles.tabText, activeTab === 'active' && styles.activeTabText]}>
-              Active
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'archived' && styles.activeTab]}
-            onPress={() => handleTabChange('archived')}
-          >
-            <Text style={[styles.tabText, activeTab === 'archived' && styles.activeTabText]}>
-              Archived
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
       <FlatList
         data={history}
         renderItem={renderItem}
         keyExtractor={(item) => item.id.toString()}
         contentContainerStyle={styles.listContent}
+        ListHeaderComponent={
+          <View style={styles.header}>
+            <View style={styles.headerTop}>
+              <Text style={styles.headerTitle}>Visited Spots 🛹</Text>
+              <TouchableOpacity
+                style={styles.selectButton}
+                onPress={() => setIsSelectMode(!isSelectMode)}
+              >
+                <Text style={styles.selectButtonText}>
+                  {isSelectMode ? 'Cancel' : 'Select'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {isSelectMode ? (
+              <View style={styles.batchHeaderActions}>
+                <TouchableOpacity onPress={handleSelectAll}>
+                  <Text style={styles.batchActionLink}>
+                    {selectedIds.size === history.length ? 'Deselect All' : 'Select All'}
+                  </Text>
+                </TouchableOpacity>
+                <Text style={styles.headerSubtitle}>
+                  {selectedIds.size} selected
+                </Text>
+              </View>
+            ) : (
+              <Text style={styles.headerSubtitle}>
+                {history.length} check-ins total
+              </Text>
+            )}
+
+            <View style={styles.tabsContainer}>
+              <TouchableOpacity
+                style={[styles.tab, activeTab === 'active' && styles.activeTab]}
+                onPress={() => handleTabChange('active')}
+              >
+                <Text style={[styles.tabText, activeTab === 'active' && styles.activeTabText]}>
+                  Active
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.tab, activeTab === 'archived' && styles.activeTab]}
+                onPress={() => handleTabChange('archived')}
+              >
+                <Text style={[styles.tabText, activeTab === 'archived' && styles.activeTabText]}>
+                  Archived
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        }
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
