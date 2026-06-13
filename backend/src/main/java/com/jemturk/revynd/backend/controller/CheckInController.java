@@ -16,6 +16,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.jemturk.revynd.backend.dto.CheckInRecord;
 import com.jemturk.revynd.backend.dto.CheckInRequestDTO;
@@ -92,14 +94,18 @@ public class CheckInController {
     }
 
     @GetMapping("/history")
-    public ResponseEntity<List<CheckInRecord>> getUserCheckInHistory(Principal principal) {
+    public ResponseEntity<List<CheckInRecord>> getUserCheckInHistory(
+            @RequestParam(required = false, defaultValue = "false") boolean archived,
+            Principal principal) {
         // 🔒 Get currently authenticated user from Principal
         String email = principal.getName();
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
         // 🔒 The DB only returns the records belonging to the calling User ID
-        List<CheckInRecord> history = checkInRepository.findHistoryByUserId(user.getId());
+        List<CheckInRecord> history = archived
+                ? checkInRepository.findArchivedHistoryByUserId(user.getId())
+                : checkInRepository.findHistoryByUserId(user.getId());
         return ResponseEntity.ok(history);
     }
 
@@ -120,6 +126,96 @@ public class CheckInController {
 
         checkInRepository.delete(checkIn);
         return ResponseEntity.noContent().build(); // Sends 204 Success
+    }
+
+    @PutMapping("/history/{id}/archive")
+    @Transactional
+    public ResponseEntity<Void> archiveHistoryItem(@PathVariable Long id, Principal principal) {
+        String email = principal.getName();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        CheckIn checkIn = checkInRepository.findById(id).orElse(null);
+        if (checkIn == null) {
+            return ResponseEntity.notFound().build();
+        }
+        if (!checkIn.getUser().getId().equals(user.getId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+
+        checkIn.setArchived(true);
+        checkInRepository.save(checkIn);
+        return ResponseEntity.ok().build();
+    }
+
+    @PutMapping("/history/{id}/unarchive")
+    @Transactional
+    public ResponseEntity<Void> unarchiveHistoryItem(@PathVariable Long id, Principal principal) {
+        String email = principal.getName();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        CheckIn checkIn = checkInRepository.findById(id).orElse(null);
+        if (checkIn == null) {
+            return ResponseEntity.notFound().build();
+        }
+        if (!checkIn.getUser().getId().equals(user.getId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+
+        checkIn.setArchived(false);
+        checkInRepository.save(checkIn);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/history/batch-archive")
+    @Transactional
+    public ResponseEntity<Void> batchArchiveHistory(@RequestBody List<Long> ids, Principal principal) {
+        String email = principal.getName();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        List<CheckIn> checkIns = checkInRepository.findAllById(ids);
+        for (CheckIn c : checkIns) {
+            if (c.getUser().getId().equals(user.getId())) {
+                c.setArchived(true);
+            }
+        }
+        checkInRepository.saveAll(checkIns);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/history/batch-unarchive")
+    @Transactional
+    public ResponseEntity<Void> batchUnarchiveHistory(@RequestBody List<Long> ids, Principal principal) {
+        String email = principal.getName();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        List<CheckIn> checkIns = checkInRepository.findAllById(ids);
+        for (CheckIn c : checkIns) {
+            if (c.getUser().getId().equals(user.getId())) {
+                c.setArchived(false);
+            }
+        }
+        checkInRepository.saveAll(checkIns);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/history/batch-delete")
+    @Transactional
+    public ResponseEntity<Void> batchDeleteHistory(@RequestBody List<Long> ids, Principal principal) {
+        String email = principal.getName();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        List<CheckIn> checkIns = checkInRepository.findAllById(ids);
+        List<CheckIn> toDelete = checkIns.stream()
+                .filter(c -> c.getUser().getId().equals(user.getId()))
+                .collect(Collectors.toList());
+
+        checkInRepository.deleteAll(toDelete);
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/checkins")

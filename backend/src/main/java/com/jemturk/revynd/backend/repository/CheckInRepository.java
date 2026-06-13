@@ -42,9 +42,16 @@ public interface CheckInRepository extends JpaRepository<CheckIn, Long> {
        @Query("SELECT new com.jemturk.revynd.backend.dto.CheckInRecord(c.id, c.spot.name, c.vibeTag, c.checkInTime, c.intensityAtTime) "
                      +
                      "FROM CheckIn c " +
-                     "WHERE c.user.id = :userId " +
+                     "WHERE c.user.id = :userId AND c.archived = false " +
                      "ORDER BY c.checkInTime DESC")
        List<CheckInRecord> findHistoryByUserId(@Param("userId") Long userId);
+
+       @Query("SELECT new com.jemturk.revynd.backend.dto.CheckInRecord(c.id, c.spot.name, c.vibeTag, c.checkInTime, c.intensityAtTime) "
+                     +
+                     "FROM CheckIn c " +
+                     "WHERE c.user.id = :userId AND c.archived = true " +
+                     "ORDER BY c.checkInTime DESC")
+       List<CheckInRecord> findArchivedHistoryByUserId(@Param("userId") Long userId);
 
        /**
         * Find all check-ins after a specific time.

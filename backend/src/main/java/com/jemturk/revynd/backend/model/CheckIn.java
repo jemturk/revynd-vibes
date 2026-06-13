@@ -36,6 +36,9 @@ public class CheckIn {
     @Column(name = "vibe_tag")
     private String vibeTag;
 
+    @Column(nullable = false, columnDefinition = "boolean default false")
+    private boolean archived = false;
+
     @PrePersist
     protected void onCreate() {
         checkInTime = LocalDateTime.now();
