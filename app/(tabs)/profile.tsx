@@ -88,6 +88,11 @@ export default function AccountScreen() {
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
   const [isLoadingFriends, setIsLoadingFriends] = useState(false);
 
+  // Blocked Users state
+  const [showBlockedModal, setShowBlockedModal] = useState(false);
+  const [blockedList, setBlockedList] = useState<any[]>([]);
+  const [isLoadingBlocked, setIsLoadingBlocked] = useState(false);
+
   // Remove confirmation states
   const [confirmingFriendId, setConfirmingFriendId] = useState<number | string | null>(null);
   const [confirmCountdown, setConfirmCountdown] = useState<number>(0);
@@ -685,6 +690,73 @@ export default function AccountScreen() {
     }
   };
 
+  const refreshBlockedData = async () => {
+    setIsLoadingBlocked(true);
+    try {
+      const response = await fetch(`${API_URL}/api/friends/blocked`, {
+        headers: await buildAuthHeaders(),
+      });
+      const raw = await response.text();
+      let blockedData: any[] = [];
+      try {
+        blockedData = raw ? JSON.parse(raw) : [];
+      } catch (err) {
+        console.error('Failed to parse blocked users list:', raw);
+      }
+      setBlockedList(blockedData);
+    } catch (err) {
+      console.error('Fetch blocked data error:', err);
+    } finally {
+      setIsLoadingBlocked(false);
+    }
+  };
+
+  const handleBlockUser = async (friendId: number | string, friendName: string) => {
+    try {
+      const response = await fetch(`${API_URL}/api/friends/block/${friendId}`, {
+        method: 'POST',
+        headers: await buildAuthHeaders('application/json'),
+      });
+      if (response.ok) {
+        await refreshFriendsData();
+        setSuccessMessage(`${friendName} has been blocked.`);
+      } else {
+        const raw = await response.text();
+        let payload: any = {};
+        try { payload = raw ? JSON.parse(raw) : {}; } catch { }
+        Alert.alert('Error', payload.message || 'Failed to block user.');
+      }
+    } catch (err) {
+      console.error('Block user error:', err);
+      Alert.alert('Error', 'An unexpected error occurred.');
+    } finally {
+      setConfirmingFriendId(null);
+      setConfirmCountdown(0);
+      clearConfirmTimer();
+    }
+  };
+
+  const handleUnblockUser = async (targetUserId: number | string, userName: string) => {
+    try {
+      const response = await fetch(`${API_URL}/api/friends/unblock/${targetUserId}`, {
+        method: 'DELETE',
+        headers: await buildAuthHeaders('application/json'),
+      });
+      if (response.ok) {
+        await refreshBlockedData();
+        setSuccessMessage(`${userName} has been unblocked.`);
+      } else {
+        const raw = await response.text();
+        let payload: any = {};
+        try { payload = raw ? JSON.parse(raw) : {}; } catch { }
+        Alert.alert('Error', payload.message || 'Failed to unblock user.');
+      }
+    } catch (err) {
+      console.error('Unblock user error:', err);
+      Alert.alert('Error', 'An unexpected error occurred.');
+    }
+  };
+
   const handleToggleNotif = async (type: 'vibePeak' | 'proximity' | 'social', value: boolean) => {
     if (type === 'vibePeak') {
       setNotifVibePeak(value);
@@ -817,6 +889,15 @@ export default function AccountScreen() {
             setEditName(user?.name || '');
             setEditErrorMessage(null);
             setShowEditModal(true);
+          }}
+        />
+        <AccountItem
+          icon="block"
+          label="Blocked Users"
+          styles={styles}
+          onPress={() => {
+            setShowBlockedModal(true);
+            refreshBlockedData();
           }}
         />
         <AccountItem
@@ -1329,10 +1410,47 @@ export default function AccountScreen() {
                       {(() => {
                         const isConfirmingThis = confirmingFriendId === friend.id;
                         const isTimerActive = isConfirmingThis && confirmCountdown > 0;
+
+                        if (isConfirmingThis && !isTimerActive) {
+                          return (
+                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                              <TouchableOpacity
+                                style={[
+                                  styles.addFriendBtn,
+                                  {
+                                    backgroundColor: '#EF4444',
+                                    paddingHorizontal: 10,
+                                    marginRight: 6,
+                                    paddingVertical: 6,
+                                    borderRadius: 14
+                                  }
+                                ]}
+                                onPress={() => handleRemoveFriend(friend.id, friend.name)}
+                              >
+                                <Text style={[styles.addFriendBtnText, { fontSize: 13 }]}>Unfriend</Text>
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                style={[
+                                  styles.addFriendBtn,
+                                  {
+                                    backgroundColor: '#1E293B',
+                                    paddingHorizontal: 10,
+                                    paddingVertical: 6,
+                                    borderRadius: 14
+                                  }
+                                ]}
+                                onPress={() => handleBlockUser(friend.id, friend.name)}
+                              >
+                                <Text style={[styles.addFriendBtnText, { fontSize: 13 }]}>Block</Text>
+                              </TouchableOpacity>
+                            </View>
+                          );
+                        }
+
                         const btnText = isConfirmingThis
-                          ? (isTimerActive ? `Are you sure? (${confirmCountdown}s)` : "Are you sure?")
+                          ? `Are you sure? (${confirmCountdown}s)`
                           : "Remove";
-                        const btnBgColor = isTimerActive ? '#FCA5A5' : '#EF4444'; // Lighter red if countdown active
+                        const btnBgColor = isTimerActive ? '#FCA5A5' : '#EF4444';
 
                         return (
                           <TouchableOpacity
@@ -1458,6 +1576,69 @@ export default function AccountScreen() {
                 onPress={() => setShowNotifModal(false)}
               >
                 <Text style={styles.modalDeleteText}>Done</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Blocked Users Modal */}
+      <Modal
+        visible={showBlockedModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowBlockedModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContainer, { maxHeight: '80%' }]}>
+            <Text style={styles.modalTitle}>Blocked Users</Text>
+            <Text style={styles.modalMessage}>
+              Blocked users cannot send you friend requests, view your profile, or find you in search/sync.
+            </Text>
+
+            {isLoadingBlocked ? (
+              <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+                <ActivityIndicator size="large" color="#FB923C" />
+              </View>
+            ) : blockedList.length === 0 ? (
+              <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+                <MaterialIcons name="block" size={48} color={theme.border} />
+                <Text style={{ marginTop: 12, color: theme.subtext, fontWeight: '500' }}>No blocked users.</Text>
+              </View>
+            ) : (
+              <ScrollView style={{ marginBottom: 20 }}>
+                {blockedList.map((blockedUser) => (
+                  <View key={blockedUser.id} style={styles.friendRow}>
+                    <View style={styles.friendAvatar}>
+                      {blockedUser.profilePicture ? (
+                        <Image source={{ uri: blockedUser.profilePicture }} style={styles.friendAvatarImg} />
+                      ) : (
+                        <Text style={styles.friendAvatarText}>
+                          {blockedUser.name ? blockedUser.name.charAt(0).toUpperCase() : 'U'}
+                        </Text>
+                      )}
+                    </View>
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                      <Text style={styles.friendName}>{blockedUser.name}</Text>
+                      <Text style={styles.friendSub}>{blockedUser.email}</Text>
+                    </View>
+                    <TouchableOpacity
+                      style={[styles.addFriendBtn, { backgroundColor: '#0D9488' }]}
+                      onPress={() => handleUnblockUser(blockedUser.id, blockedUser.name)}
+                    >
+                      <Text style={styles.addFriendBtnText}>Unblock</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+
+            <View style={[styles.modalButtons, { marginTop: 10 }]}>
+              <Pressable
+                style={[styles.modalButton, { backgroundColor: '#FB923C', marginRight: 0 }]}
+                onPress={() => setShowBlockedModal(false)}
+              >
+                <Text style={styles.modalDeleteText}>Close</Text>
               </Pressable>
             </View>
           </View>

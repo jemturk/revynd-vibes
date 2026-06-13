@@ -7,7 +7,9 @@ import {
   RefreshControl,
   ActivityIndicator,
   TouchableOpacity,
-  Alert
+  Alert,
+  Modal,
+  Pressable
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Swipeable } from 'react-native-gesture-handler';
@@ -34,6 +36,11 @@ const HistoryScreen = () => {
   const [activeTab, setActiveTab] = useState<'active' | 'archived'>('active');
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+
+  // Confirmation Modal states
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteMode, setDeleteMode] = useState<'single' | 'batch' | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
 
   const API_URL = 'https://revynd-api-939729691035.us-east1.run.app';
   const swipeableRefs = useRef<{ [key: number]: Swipeable | null }>({});
@@ -238,18 +245,56 @@ const HistoryScreen = () => {
     archiveButton: { backgroundColor: '#F97316' },
     restoreButton: { backgroundColor: '#10B981' },
     deleteButton: { backgroundColor: '#EF4444' },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(15, 23, 42, 0.7)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 20,
+    },
+    modalContainer: {
+      width: '100%',
+      maxWidth: 420,
+      backgroundColor: theme.card,
+      borderRadius: 22,
+      padding: 24,
+      shadowColor: '#000',
+      shadowOpacity: 0.18,
+      shadowRadius: 20,
+      shadowOffset: { width: 0, height: 8 },
+      elevation: 16,
+    },
+    modalTitle: { fontSize: 20, fontWeight: '700', color: theme.text, marginBottom: 12 },
+    modalMessage: { fontSize: 15, color: theme.subtext, lineHeight: 22, marginBottom: 24 },
+    modalButtons: { flexDirection: 'row', justifyContent: 'space-between' },
+    modalButton: {
+      flex: 1,
+      paddingVertical: 14,
+      borderRadius: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    modalCancelButton: {
+      backgroundColor: theme.background,
+      borderWidth: 1,
+      borderColor: theme.border,
+      marginRight: 12,
+    },
+    modalDeleteButton: { backgroundColor: '#ef4444' },
+    modalCancelText: { color: theme.text, fontSize: 15, fontWeight: '600' },
+    modalDeleteText: { color: '#fff', fontSize: 15, fontWeight: '700' },
   }), [theme]);
 
-  const buildAuthHeaders = async (contentType?: string) => {
+  const buildAuthHeaders = useCallback(async (contentType?: string) => {
     const token = await SecureStore.getItemAsync('user_token');
     return {
       Accept: 'application/json',
       ...(contentType ? { 'Content-Type': contentType } : {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     };
-  };
+  }, []);
 
-  const fetchHistory = async (archivedParam: boolean): Promise<CheckInRecord[]> => {
+  const fetchHistory = useCallback(async (archivedParam: boolean): Promise<CheckInRecord[]> => {
     try {
       const response = await fetch(`${API_URL}/api/checkins/history?archived=${archivedParam}`, {
         headers: await buildAuthHeaders(),
@@ -288,26 +333,33 @@ const HistoryScreen = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [buildAuthHeaders]);
 
   const loadHistory = useCallback((tab: 'active' | 'archived', showLoading = true) => {
     if (showLoading) {
       setLoading(true);
+      setHistory([]);
     }
     fetchHistory(tab === 'archived').then(setHistory);
-  }, []);
+  }, [fetchHistory]);
 
   useFocusEffect(
     useCallback(() => {
-      loadHistory(activeTab, true);
+      loadHistory(activeTab, history.length === 0);
       return () => {};
-    }, [activeTab, loadHistory])
+    }, [activeTab, loadHistory, history.length])
   );
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     fetchHistory(activeTab === 'archived').then(setHistory);
-  }, [activeTab]);
+  }, [activeTab, fetchHistory]);
+
+  const handleTabChange = (tab: 'active' | 'archived') => {
+    setActiveTab(tab);
+    setHistory([]);
+    setLoading(true);
+  };
 
   // Single Item API Operations
   const deleteCheckIn = async (id: number) => {
@@ -372,21 +424,11 @@ const HistoryScreen = () => {
   };
 
   // Single Handlers
-  const handleDelete = async (id: number) => {
+  const handleDelete = (id: number) => {
     swipeableRefs.current[id]?.close();
-
-    setTimeout(async () => {
-      const previous = history;
-      setHistory(prev => prev.filter(item => item.id !== id));
-
-      try {
-        await deleteCheckIn(id);
-        delete swipeableRefs.current[id];
-      } catch (error) {
-        setHistory(previous);
-        Alert.alert('Error', 'Could not delete from server.');
-      }
-    }, 200);
+    setPendingDeleteId(id);
+    setDeleteMode('single');
+    setShowDeleteModal(true);
   };
 
   const handleArchive = async (id: number) => {
@@ -476,34 +518,52 @@ const HistoryScreen = () => {
     }
   };
 
-  const handleBatchDelete = async () => {
+  const handleBatchDelete = () => {
     if (selectedIds.size === 0) return;
-    const count = selectedIds.size;
-    Alert.alert(
-      'Confirm Delete',
-      `Are you sure you want to permanently delete these ${count} check-ins?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            const ids = Array.from(selectedIds);
-            const previous = history;
-            setHistory(prev => prev.filter(item => !selectedIds.has(item.id)));
-            setIsSelectMode(false);
-            setSelectedIds(new Set());
+    setDeleteMode('batch');
+    setShowDeleteModal(true);
+  };
 
-            try {
-              await batchDelete(ids);
-            } catch (error) {
-              setHistory(previous);
-              Alert.alert('Error', 'Failed to delete selected items.');
-            }
-          }
-        }
-      ]
-    );
+  const cancelDelete = () => {
+    setShowDeleteModal(false);
+    setPendingDeleteId(null);
+    setDeleteMode(null);
+  };
+
+  const confirmDelete = async () => {
+    setShowDeleteModal(false);
+
+    if (deleteMode === 'single' && pendingDeleteId !== null) {
+      const id = pendingDeleteId;
+      const previous = history;
+      setHistory(prev => prev.filter(item => item.id !== id));
+
+      try {
+        await deleteCheckIn(id);
+        delete swipeableRefs.current[id];
+      } catch (error) {
+        setHistory(previous);
+        Alert.alert('Error', 'Could not delete from server.');
+      } finally {
+        setPendingDeleteId(null);
+        setDeleteMode(null);
+      }
+    } else if (deleteMode === 'batch') {
+      const ids = Array.from(selectedIds);
+      const previous = history;
+      setHistory(prev => prev.filter(item => !selectedIds.has(item.id)));
+      setIsSelectMode(false);
+      setSelectedIds(new Set());
+
+      try {
+        await batchDelete(ids);
+      } catch (error) {
+        setHistory(previous);
+        Alert.alert('Error', 'Failed to delete selected items.');
+      } finally {
+        setDeleteMode(null);
+      }
+    }
   };
 
   // Reset selection when changing tabs or select mode toggled off
@@ -631,14 +691,6 @@ const HistoryScreen = () => {
     );
   };
 
-  if (loading && !refreshing) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={theme.primary} />
-      </View>
-    );
-  }
-
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -674,7 +726,7 @@ const HistoryScreen = () => {
         <View style={styles.tabsContainer}>
           <TouchableOpacity
             style={[styles.tab, activeTab === 'active' && styles.activeTab]}
-            onPress={() => setActiveTab('active')}
+            onPress={() => handleTabChange('active')}
           >
             <Text style={[styles.tabText, activeTab === 'active' && styles.activeTabText]}>
               Active
@@ -682,7 +734,7 @@ const HistoryScreen = () => {
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.tab, activeTab === 'archived' && styles.activeTab]}
-            onPress={() => setActiveTab('archived')}
+            onPress={() => handleTabChange('archived')}
           >
             <Text style={[styles.tabText, activeTab === 'archived' && styles.activeTabText]}>
               Archived
@@ -704,12 +756,18 @@ const HistoryScreen = () => {
           />
         }
         ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <MaterialIcons name="history" size={48} color={theme.subtext} />
-            <Text style={styles.emptyText}>
-              {activeTab === 'archived' ? 'No archived check-ins.' : 'No check-ins yet.'}
-            </Text>
-          </View>
+          loading ? (
+            <View style={{ marginTop: 100, justifyContent: 'center', alignItems: 'center' }}>
+              <ActivityIndicator size="large" color={theme.primary} />
+            </View>
+          ) : (
+            <View style={styles.emptyState}>
+              <MaterialIcons name="history" size={48} color={theme.subtext} />
+              <Text style={styles.emptyText}>
+                {activeTab === 'archived' ? 'No archived check-ins.' : 'No check-ins yet.'}
+              </Text>
+            </View>
+          )
         }
       />
 
@@ -750,6 +808,39 @@ const HistoryScreen = () => {
           </View>
         </Animated.View>
       )}
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        visible={showDeleteModal}
+        transparent
+        animationType="fade"
+        onRequestClose={cancelDelete}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>Delete check-in?</Text>
+            <Text style={styles.modalMessage}>
+              {deleteMode === 'batch'
+                ? `Are you sure you want to permanently delete these ${selectedIds.size} check-ins? This action cannot be undone.`
+                : 'Are you sure you want to permanently delete this check-in? This action cannot be undone.'}
+            </Text>
+            <View style={styles.modalButtons}>
+              <Pressable
+                style={[styles.modalButton, styles.modalCancelButton]}
+                onPress={cancelDelete}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.modalButton, styles.modalDeleteButton]}
+                onPress={confirmDelete}
+              >
+                <Text style={styles.modalDeleteText}>Delete</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };

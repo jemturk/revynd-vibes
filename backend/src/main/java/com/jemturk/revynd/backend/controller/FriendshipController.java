@@ -4,8 +4,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import com.jemturk.revynd.backend.model.User;
 import com.jemturk.revynd.backend.model.Friendship;
+import com.jemturk.revynd.backend.model.Block;
 import com.jemturk.revynd.backend.repository.UserRepository;
 import com.jemturk.revynd.backend.repository.FriendshipRepository;
+import com.jemturk.revynd.backend.repository.BlockRepository;
 import java.security.Principal;
 import java.util.*;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +23,7 @@ public class FriendshipController {
 
     private final UserRepository userRepository;
     private final FriendshipRepository friendshipRepository;
+    private final BlockRepository blockRepository;
     private final ExpoPushNotificationService expoPushNotificationService;
 
     @PostMapping("/request/{targetUserId}")
@@ -36,6 +39,12 @@ public class FriendshipController {
 
         User receiver = userRepository.findById(targetUserId)
                 .orElseThrow(() -> new RuntimeException("Target user not found"));
+
+        // Check if a block relationship exists in either direction
+        if (blockRepository.existsByBlockerIdAndBlockedId(requester.getId(), targetUserId) ||
+            blockRepository.existsByBlockerIdAndBlockedId(targetUserId, requester.getId())) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Friend request already exists or you are already friends."));
+        }
 
         Optional<Friendship> existing = friendshipRepository.findAnyRelationship(requester.getId(), targetUserId);
         if (existing.isPresent()) {
@@ -111,6 +120,73 @@ public class FriendshipController {
         return ResponseEntity.ok(Map.of("message", "Friend removed successfully"));
     }
 
+    @PostMapping("/block/{targetUserId}")
+    @Transactional
+    public ResponseEntity<?> blockUser(@PathVariable Long targetUserId, Principal principal) {
+        String email = principal.getName();
+        User currentUser = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (currentUser.getId().equals(targetUserId)) {
+            return ResponseEntity.badRequest().body(Map.of("message", "You cannot block yourself."));
+        }
+
+        User targetUser = userRepository.findById(targetUserId)
+                .orElseThrow(() -> new RuntimeException("Target user not found"));
+
+        // 1. Remove any active or pending friendship
+        Optional<Friendship> friendshipOpt = friendshipRepository.findAnyRelationship(currentUser.getId(), targetUserId);
+        friendshipOpt.ifPresent(friendshipRepository::delete);
+
+        // 2. Create the block record if it doesn't already exist
+        if (!blockRepository.existsByBlockerIdAndBlockedId(currentUser.getId(), targetUserId)) {
+            Block block = new Block();
+            block.setBlocker(currentUser);
+            block.setBlocked(targetUser);
+            blockRepository.save(block);
+        }
+
+        return ResponseEntity.ok(Map.of("message", "User blocked successfully"));
+    }
+
+    @DeleteMapping("/unblock/{targetUserId}")
+    @Transactional
+    public ResponseEntity<?> unblockUser(@PathVariable Long targetUserId, Principal principal) {
+        String email = principal.getName();
+        User currentUser = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        Optional<Block> blockOpt = blockRepository.findByBlockerIdAndBlockedId(currentUser.getId(), targetUserId);
+        if (blockOpt.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "User is not blocked."));
+        }
+
+        blockRepository.delete(blockOpt.get());
+        return ResponseEntity.ok(Map.of("message", "User unblocked successfully"));
+    }
+
+    @GetMapping("/blocked")
+    public ResponseEntity<?> getBlockedUsers(Principal principal) {
+        String email = principal.getName();
+        User currentUser = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        List<Block> blocks = blockRepository.findByBlockerId(currentUser.getId());
+        List<Map<String, Object>> blockedUsers = new ArrayList<>();
+
+        for (Block b : blocks) {
+            User blocked = b.getBlocked();
+            blockedUsers.add(Map.of(
+                "id", blocked.getId(),
+                "name", blocked.getName(),
+                "email", blocked.getEmail(),
+                "profilePicture", blocked.getProfilePicture() != null ? blocked.getProfilePicture() : ""
+            ));
+        }
+
+        return ResponseEntity.ok(blockedUsers);
+    }
+
     @GetMapping
     public ResponseEntity<?> getFriends(Principal principal) {
         String email = principal.getName();
@@ -173,6 +249,12 @@ public class FriendshipController {
 
         for (User u : allUsers) {
             if (u.getId().equals(currentUser.getId())) {
+                continue;
+            }
+
+            // Exclude users if there's a block in either direction
+            if (blockRepository.existsByBlockerIdAndBlockedId(currentUser.getId(), u.getId()) ||
+                blockRepository.existsByBlockerIdAndBlockedId(u.getId(), currentUser.getId())) {
                 continue;
             }
 
@@ -248,6 +330,12 @@ public class FriendshipController {
         User u = foundUserOpt.get();
         if (u.getId().equals(currentUser.getId())) {
             return ResponseEntity.ok(Collections.emptyList()); // Don't return self
+        }
+
+        // Hide user if there is a block in either direction
+        if (blockRepository.existsByBlockerIdAndBlockedId(currentUser.getId(), u.getId()) ||
+            blockRepository.existsByBlockerIdAndBlockedId(u.getId(), currentUser.getId())) {
+            return ResponseEntity.ok(Collections.emptyList());
         }
 
         Optional<Friendship> rel = friendshipRepository.findAnyRelationship(currentUser.getId(), u.getId());
