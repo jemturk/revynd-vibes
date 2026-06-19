@@ -36,6 +36,13 @@ const HistoryScreen = () => {
   const [activeTab, setActiveTab] = useState<'active' | 'archived'>('active');
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [isAtTop, setIsAtTop] = useState(true);
+
+  const handleScroll = useCallback((event: any) => {
+    const y = event.nativeEvent.contentOffset.y;
+    const atTop = y <= 10;
+    setIsAtTop((prev) => (prev !== atTop ? atTop : prev));
+  }, []);
 
   // Confirmation Modal states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -48,14 +55,24 @@ const HistoryScreen = () => {
   const styles = useMemo(() => StyleSheet.create({
     container: { flex: 1, backgroundColor: theme.background },
     center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    header: {
+    fixedHeader: {
       paddingTop: 45,
       paddingHorizontal: 20,
-      paddingBottom: 20,
+      paddingBottom: 12,
+      backgroundColor: theme.card,
+      zIndex: 10,
+    },
+    fixedHeaderBorder: {
+      borderBottomWidth: 1,
+      borderBottomColor: theme.border,
+    },
+    scrollHeader: {
+      paddingHorizontal: 20,
+      paddingBottom: 16,
       backgroundColor: theme.card,
       borderBottomWidth: 1,
       borderBottomColor: theme.border,
-      marginBottom: 20,
+      marginBottom: 16,
     },
     headerTop: {
       flexDirection: 'row',
@@ -694,42 +711,46 @@ const HistoryScreen = () => {
 
   return (
     <View style={styles.container}>
+      <View style={[styles.fixedHeader, !isAtTop && styles.fixedHeaderBorder]}>
+        <View style={styles.headerTop}>
+          <Text style={styles.headerTitle}>Visited Spots 🛹</Text>
+          <TouchableOpacity
+            style={styles.selectButton}
+            onPress={() => setIsSelectMode(!isSelectMode)}
+          >
+            <Text style={styles.selectButtonText}>
+              {isSelectMode ? 'Cancel' : 'Select'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {isSelectMode ? (
+          <View style={styles.batchHeaderActions}>
+            <TouchableOpacity onPress={handleSelectAll}>
+              <Text style={styles.batchActionLink}>
+                {selectedIds.size === history.length ? 'Deselect All' : 'Select All'}
+              </Text>
+            </TouchableOpacity>
+            <Text style={styles.headerSubtitle}>
+              {selectedIds.size} selected
+            </Text>
+          </View>
+        ) : (
+          <Text style={styles.headerSubtitle}>
+            {history.length} check-ins total
+          </Text>
+        )}
+      </View>
+
       <FlatList
         data={history}
         renderItem={renderItem}
         keyExtractor={(item) => item.id.toString()}
         contentContainerStyle={styles.listContent}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
         ListHeaderComponent={
-          <View style={styles.header}>
-            <View style={styles.headerTop}>
-              <Text style={styles.headerTitle}>Visited Spots 🛹</Text>
-              <TouchableOpacity
-                style={styles.selectButton}
-                onPress={() => setIsSelectMode(!isSelectMode)}
-              >
-                <Text style={styles.selectButtonText}>
-                  {isSelectMode ? 'Cancel' : 'Select'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {isSelectMode ? (
-              <View style={styles.batchHeaderActions}>
-                <TouchableOpacity onPress={handleSelectAll}>
-                  <Text style={styles.batchActionLink}>
-                    {selectedIds.size === history.length ? 'Deselect All' : 'Select All'}
-                  </Text>
-                </TouchableOpacity>
-                <Text style={styles.headerSubtitle}>
-                  {selectedIds.size} selected
-                </Text>
-              </View>
-            ) : (
-              <Text style={styles.headerSubtitle}>
-                {history.length} check-ins total
-              </Text>
-            )}
-
+          <View style={styles.scrollHeader}>
             <View style={styles.tabsContainer}>
               <TouchableOpacity
                 style={[styles.tab, activeTab === 'active' && styles.activeTab]}

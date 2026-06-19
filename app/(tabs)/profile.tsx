@@ -95,23 +95,11 @@ export default function AccountScreen() {
 
   // Remove confirmation states
   const [confirmingFriendId, setConfirmingFriendId] = useState<number | string | null>(null);
-  const [confirmCountdown, setConfirmCountdown] = useState<number>(0);
-  const confirmIntervalRef = useRef<NodeJS.Timeout | null>(null);
-
-  const clearConfirmTimer = () => {
-    if (confirmIntervalRef.current) {
-      clearInterval(confirmIntervalRef.current);
-      confirmIntervalRef.current = null;
-    }
-  };
 
   useEffect(() => {
     if (!showFriendsModal) {
       setConfirmingFriendId(null);
-      setConfirmCountdown(0);
-      clearConfirmTimer();
     }
-    return () => clearConfirmTimer();
   }, [showFriendsModal]);
 
   const [showNotifModal, setShowNotifModal] = useState(false);
@@ -527,7 +515,8 @@ export default function AccountScreen() {
       const raw = await response.text();
       let matchedUsers: any[] = [];
       try {
-        matchedUsers = raw ? JSON.parse(raw) : [];
+        const parsed = raw ? JSON.parse(raw) : [];
+        matchedUsers = Array.isArray(parsed) ? parsed : [];
       } catch {
         console.error('Failed to parse sync response:', raw);
       }
@@ -596,7 +585,12 @@ export default function AccountScreen() {
       });
       const rawFriends = await resFriends.text();
       let friendsData: any[] = [];
-      try { friendsData = rawFriends ? JSON.parse(rawFriends) : []; } catch { console.error('Failed to parse friends list:', rawFriends); }
+      try {
+        const parsed = rawFriends ? JSON.parse(rawFriends) : [];
+        friendsData = Array.isArray(parsed) ? parsed : [];
+      } catch {
+        console.error('Failed to parse friends list:', rawFriends);
+      }
       setFriendsList(friendsData);
 
       const resPending = await fetch(`${API_URL}/api/friends/pending`, {
@@ -604,7 +598,12 @@ export default function AccountScreen() {
       });
       const rawPending = await resPending.text();
       let pendingData: any[] = [];
-      try { pendingData = rawPending ? JSON.parse(rawPending) : []; } catch { console.error('Failed to parse pending requests:', rawPending); }
+      try {
+        const parsed = rawPending ? JSON.parse(rawPending) : [];
+        pendingData = Array.isArray(parsed) ? parsed : [];
+      } catch {
+        console.error('Failed to parse pending requests:', rawPending);
+      }
       setPendingRequests(pendingData);
     } catch (err) {
       console.error('Fetch friends data error:', err);
@@ -650,8 +649,7 @@ export default function AccountScreen() {
   };
 
   const handleRemoveFriend = async (friendId: number | string, friendName: string) => {
-    // If we are already confirming this friend and the countdown is 0, execute removal!
-    if (confirmingFriendId === friendId && confirmCountdown === 0) {
+    if (confirmingFriendId === friendId) {
       try {
         const response = await fetch(`${API_URL}/api/friends/remove/${friendId}`, {
           method: 'DELETE',
@@ -668,25 +666,9 @@ export default function AccountScreen() {
         Alert.alert('Error', 'An unexpected error occurred.');
       } finally {
         setConfirmingFriendId(null);
-        setConfirmCountdown(0);
-        clearConfirmTimer();
       }
     } else {
-      // First click: start confirmation countdown
-      clearConfirmTimer();
       setConfirmingFriendId(friendId);
-      setConfirmCountdown(3);
-
-      const interval = setInterval(() => {
-        setConfirmCountdown(prev => {
-          if (prev <= 1) {
-            clearInterval(interval);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-      confirmIntervalRef.current = interval;
     }
   };
 
@@ -699,7 +681,8 @@ export default function AccountScreen() {
       const raw = await response.text();
       let blockedData: any[] = [];
       try {
-        blockedData = raw ? JSON.parse(raw) : [];
+        const parsed = raw ? JSON.parse(raw) : [];
+        blockedData = Array.isArray(parsed) ? parsed : [];
       } catch (err) {
         console.error('Failed to parse blocked users list:', raw);
       }
@@ -731,8 +714,6 @@ export default function AccountScreen() {
       Alert.alert('Error', 'An unexpected error occurred.');
     } finally {
       setConfirmingFriendId(null);
-      setConfirmCountdown(0);
-      clearConfirmTimer();
     }
   };
 
@@ -1409,9 +1390,8 @@ export default function AccountScreen() {
                       </View>
                       {(() => {
                         const isConfirmingThis = confirmingFriendId === friend.id;
-                        const isTimerActive = isConfirmingThis && confirmCountdown > 0;
 
-                        if (isConfirmingThis && !isTimerActive) {
+                        if (isConfirmingThis) {
                           return (
                             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                               <TouchableOpacity
@@ -1447,19 +1427,13 @@ export default function AccountScreen() {
                           );
                         }
 
-                        const btnText = isConfirmingThis
-                          ? `Are you sure? (${confirmCountdown}s)`
-                          : "Remove";
-                        const btnBgColor = isTimerActive ? '#FCA5A5' : '#EF4444';
-
                         return (
                           <TouchableOpacity
-                            style={[styles.addFriendBtn, { backgroundColor: btnBgColor }]}
+                            style={[styles.addFriendBtn, { backgroundColor: '#EF4444' }]}
                             onPress={() => handleRemoveFriend(friend.id, friend.name)}
-                            disabled={isTimerActive}
-                            activeOpacity={isTimerActive ? 1 : 0.7}
+                            activeOpacity={0.7}
                           >
-                            <Text style={styles.addFriendBtnText}>{btnText}</Text>
+                            <Text style={styles.addFriendBtnText}>Remove</Text>
                           </TouchableOpacity>
                         );
                       })()}
