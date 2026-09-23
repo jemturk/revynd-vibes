@@ -51,6 +51,10 @@ type SearchPlace = {
   coords: [number, number];
 };
 
+type DestinationPreview = SearchPlace & {
+  counts: Record<string, number>;
+};
+
 const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
   const R = 6371e3;
   const φ1 = lat1 * Math.PI / 180;
@@ -94,6 +98,8 @@ export default function MapScreen() {
   const [searchResults, setSearchResults] = useState<SearchPlace[]>([]);
   const [recentSearches, setRecentSearches] = useState<SearchPlace[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [destinationPreview, setDestinationPreview] = useState<DestinationPreview | null>(null);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
 
   const [alertConfig, setAlertConfig] = useState<{ msg: string; type: 'error' | 'warning' | 'success' | null }>({ msg: '', type: null });
   const slideAnim = useRef(new Animated.Value(-100)).current; // Start off-screen
@@ -452,6 +458,36 @@ export default function MapScreen() {
     setShowSearchModal(false);
     setSearchResults([]);
     setSearchQuery('');
+    const preview: DestinationPreview = {
+      id: id || label || coords.join(','),
+      label: label || 'Selected destination',
+      coords,
+      counts: {},
+    };
+    setDestinationPreview(preview);
+    setIsLoadingPreview(true);
+
+    fetch(`${API_URL}/api/spots/explore?lat=${coords[1]}&lng=${coords[0]}&categories=bar,cafe,coffee,restaurant,tennis_courts,skatepark`)
+      .then(async response => {
+        const data = await response.json();
+        if (!response.ok || !Array.isArray(data)) throw new Error('Destination preview failed.');
+
+        const counts = data.reduce((summary: Record<string, number>, spot: any) => {
+          const category = normalizeCategory(spot.category);
+          summary[category] = (summary[category] || 0) + 1;
+          return summary;
+        }, {});
+        setDestinationPreview(current => current ? { ...current, counts } : current);
+      })
+      .catch(error => console.error('Destination preview failed:', error))
+      .finally(() => setIsLoadingPreview(false));
+  };
+
+  const exploreDestination = () => {
+    if (!destinationPreview) return;
+
+    const { coords } = destinationPreview;
+    setDestinationPreview(null);
     setInitialMapCoords(coords);
     lastFetchedCoordsRef.current = null;
     suppressCameraFetchUntilRef.current = Date.now() + 1500;
@@ -464,8 +500,6 @@ export default function MapScreen() {
   };
 
   useEffect(() => {
-    AsyncStorage.setItem('last_viewed_spot', '');
-
     const loadCheckIns = async () => {
       try {
         const stored = await AsyncStorage.getItem('last_checkins_by_spot');
@@ -552,7 +586,6 @@ export default function MapScreen() {
 
     const updateCooldown = () => {
       const elapsed = Date.now() - lastCheckInTime;
-      // const remaining = Math.max(0, Math.ceil((60000 - elapsed) / 1000));
       const remaining = Math.max(0, Math.ceil((3000 - elapsed) / 1000));
       setCooldownRemaining(remaining);
       return remaining;
@@ -756,22 +789,6 @@ export default function MapScreen() {
         console.error("Failed to start location watching", e);
       }
     })();
-
-    const loadLastSpot = async () => {
-      const saved = await AsyncStorage.getItem('last_viewed_spot');
-      if (!saved) return;
-
-      const spot: SpotFeature = JSON.parse(saved);
-      setSelectedSpot(spot);
-
-      cameraRef.current?.setCamera({
-        centerCoordinate: spot.geometry.coordinates,
-        zoomLevel: 14,
-        animationDuration: 0,
-      });
-    };
-
-    loadLastSpot();
 
     return () => {
       if (subscription) {
@@ -996,6 +1013,58 @@ export default function MapScreen() {
                 <Text style={{ color: theme.subtext, fontSize: 15, paddingTop: 14 }}>
                   No places found for this search.
                 </Text>
+              )}
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </Modal>
+
+        <Modal
+          visible={destinationPreview !== null}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setDestinationPreview(null)}
+        >
+          <TouchableOpacity
+            style={{ flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.7)', justifyContent: 'flex-end' }}
+            activeOpacity={1}
+            onPress={() => setDestinationPreview(null)}
+          >
+            <TouchableOpacity
+              activeOpacity={1}
+              style={{ backgroundColor: theme.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 34 }}
+            >
+              <Text style={{ color: theme.subtext, fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>
+                Destination preview
+              </Text>
+              <Text style={{ color: theme.text, fontSize: 25, fontWeight: '800', marginTop: 6 }}>
+                {destinationPreview?.label}
+              </Text>
+
+              {isLoadingPreview ? (
+                <View style={{ paddingVertical: 28, alignItems: 'center' }}>
+                  <ActivityIndicator size="small" color={theme.primary} />
+                </View>
+              ) : (
+                <>
+                  <Text style={{ color: theme.subtext, fontSize: 15, marginTop: 8, marginBottom: 18 }}>
+                    {Object.values(destinationPreview?.counts || {}).reduce((total, count) => total + count, 0)} spots nearby
+                  </Text>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 22 }}>
+                    {['Bar', 'Restaurant', 'Cafe', 'Tennis', 'Skate Spot'].map(category => (
+                      <View key={category} style={{ backgroundColor: `${CATEGORY_COLORS[category] || '#FB923C'}18`, borderRadius: 12, paddingVertical: 9, paddingHorizontal: 12 }}>
+                        <Text style={{ color: CATEGORY_COLORS[category] || theme.text, fontWeight: '700', fontSize: 13 }}>
+                          {destinationPreview?.counts[category] || 0} {category === 'Skate Spot' ? 'skate spots' : `${category.toLowerCase()}${category === 'Cafe' ? 's' : 's'}`}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                  <TouchableOpacity
+                    onPress={exploreDestination}
+                    style={{ backgroundColor: theme.primary, borderRadius: 14, paddingVertical: 15, alignItems: 'center' }}
+                  >
+                    <Text style={{ color: '#fff', fontWeight: '800', fontSize: 16 }}>Explore this vibe</Text>
+                  </TouchableOpacity>
+                </>
               )}
             </TouchableOpacity>
           </TouchableOpacity>
