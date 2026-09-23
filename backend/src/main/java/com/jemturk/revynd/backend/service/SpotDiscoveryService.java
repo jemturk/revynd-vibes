@@ -41,32 +41,33 @@ public class SpotDiscoveryService {
                 .map(Spot::getName)
                 .map(String::toLowerCase)
                 .collect(Collectors.toSet());
+        Set<String> returnedNames = new java.util.HashSet<>(existingNames);
 
         // 2. Query Mapbox Search API for external POIs in the area
-        String mapboxUrl = String.format(
-                "https://api.mapbox.com/search/searchbox/v1/category/%s?access_token=%s&proximity=%f,%f&limit=25",
-                categories, mapboxToken, lng, lat);
-
         try {
-            MapboxSearchResponse response = restTemplate.getForObject(mapboxUrl, MapboxSearchResponse.class);
+            for (String category : categories.split(",")) {
+                String mapboxUrl = String.format(
+                        "https://api.mapbox.com/search/searchbox/v1/category/%s?access_token=%s&proximity=%f,%f&limit=25",
+                        category.trim(), mapboxToken, lng, lat);
+                MapboxSearchResponse response = restTemplate.getForObject(mapboxUrl, MapboxSearchResponse.class);
 
-            if (response != null && response.getFeatures() != null) {
+                if (response == null || response.getFeatures() == null) {
+                    continue;
+                }
+
                 for (MapboxFeature feature : response.getFeatures()) {
                     String name = feature.getProperties().getName();
-
-                    // Skip if the venue is already active and tracked in our database
-                    if (existingNames.contains(name.toLowerCase())) {
+                    if (!returnedNames.add(name.toLowerCase())) {
                         continue;
                     }
 
-                    // Create a transient (unsaved) DTO with an intensity of 0.0
                     SpotResponseDTO transientSpot = new SpotResponseDTO();
                     transientSpot.setId("transient-" + feature.getProperties().getMapboxId());
                     transientSpot.setName(name);
                     transientSpot.setCategory(feature.getProperties().getCategoryString());
                     transientSpot.setVibe("");
-                    transientSpot.setIntensity(0.0); // No check-ins yet = dead vibe glow
-                    transientSpot.setLocation(feature.getGeometry().getCoordinates()); // [Lng, Lat]
+                    transientSpot.setIntensity(0.0);
+                    transientSpot.setLocation(feature.getGeometry().getCoordinates());
                     transientSpot.setSaved(false);
 
                     unifiedList.add(transientSpot);

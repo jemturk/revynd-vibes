@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react';
-import { StyleSheet, View, Text, Alert, TouchableOpacity, ActivityIndicator, Animated, Easing, StatusBar, ScrollView, Modal } from 'react-native';
+import { StyleSheet, View, Text, Alert, TouchableOpacity, ActivityIndicator, Animated, Easing, StatusBar, ScrollView, Modal, TextInput } from 'react-native';
 import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Mapbox from '@rnmapbox/maps';
@@ -25,8 +25,9 @@ const VIBE_TAGS_BY_CATEGORY: Record<string, string[]> = {
 const ALL_CATEGORIES = Object.keys(VIBE_TAGS_BY_CATEGORY).filter(c => c !== 'default');
 
 const API_URL = 'https://revynd-api-939729691035.us-east1.run.app';
+const MAPBOX_PUBLIC_TOKEN = Constants.expoConfig?.extra?.mapboxPublicToken || '';
 
-Mapbox.setAccessToken(Constants.expoConfig?.extra?.mapboxPublicToken || '');
+Mapbox.setAccessToken(MAPBOX_PUBLIC_TOKEN);
 
 type SpotFeature = Feature<Point, {
   id: string;
@@ -51,6 +52,11 @@ const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => 
   return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
 };
 
+const normalizeCategory = (category = '') =>
+  category.normalize('NFD').replace(/[\u0300-\u036f]/g, '') === 'Cafe'
+    ? 'Cafe'
+    : category;
+
 export default function MapScreen() {
   const { theme, isDark } = useTheme();
   const params = useLocalSearchParams();
@@ -70,6 +76,10 @@ export default function MapScreen() {
   const [showVibeSelection, setShowVibeSelection] = useState(false);
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string | null>(null);
   const [showFilterModal, setShowFilterModal] = useState(false);
+  const [showSearchModal, setShowSearchModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<Array<{ id: string; label: string; coords: [number, number] }>>([]);
+  const [isSearching, setIsSearching] = useState(false);
 
   const [alertConfig, setAlertConfig] = useState<{ msg: string; type: 'error' | 'warning' | 'success' | null }>({ msg: '', type: null });
   const slideAnim = useRef(new Animated.Value(-100)).current; // Start off-screen
@@ -329,7 +339,7 @@ export default function MapScreen() {
           id: spot.id,
           name: spot.name,
           vibe: spot.vibe,
-          category: spot.category,
+          category: normalizeCategory(spot.category),
           intensity: spot.intensity,
           isSaved: spot.saved,
         },
@@ -355,6 +365,65 @@ export default function MapScreen() {
       setIsLoading(false);
       setIsRefreshing(false);
     }
+  };
+
+  const searchCities = async (queryValue = searchQuery) => {
+    const query = queryValue.trim();
+    if (query.length < 2 || !MAPBOX_PUBLIC_TOKEN) {
+      setSearchResults([]);
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      const response = await fetch(
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_PUBLIC_TOKEN}&types=place,locality,region&limit=6`
+      );
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.message || 'Search failed.');
+
+      setSearchResults((data.features || []).map((feature: any) => ({
+        id: feature.id,
+        label: feature.place_name,
+        coords: [feature.center[0], feature.center[1]],
+      })));
+    } catch (error) {
+      console.error('City search failed:', error);
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!showSearchModal) return;
+
+    const query = searchQuery.trim();
+    if (query.length < 2) {
+      setSearchResults([]);
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      searchCities(query);
+    }, 350);
+
+    return () => clearTimeout(timeout);
+  }, [searchQuery, showSearchModal]);
+
+  const selectSearchResult = (coords: [number, number]) => {
+    setShowSearchModal(false);
+    setSearchResults([]);
+    setSearchQuery('');
+    setInitialMapCoords(coords);
+    lastFetchedCoordsRef.current = null;
+    suppressCameraFetchUntilRef.current = Date.now() + 1500;
+    fetchSpots(coords);
+    cameraRef.current?.setCamera({
+      centerCoordinate: coords,
+      zoomLevel: 13,
+      animationDuration: 1000,
+    });
   };
 
   useEffect(() => {
@@ -399,7 +468,7 @@ export default function MapScreen() {
                   id: spot.id,
                   name: spot.name,
                   vibe: spot.vibe,
-                  category: spot.category,
+                  category: normalizeCategory(spot.category),
                   intensity: spot.intensity,
                   isSaved: spot.saved,
                 },
@@ -812,6 +881,71 @@ export default function MapScreen() {
             }}
           />
         </Mapbox.MapView>
+
+        <TouchableOpacity
+          style={[
+            styles.floatingButton,
+            {
+              bottom: buttonBottom + 192,
+              opacity: sheetIndex >= 2 ? 0 : 1,
+              backgroundColor: theme.card
+            }
+          ]}
+          onPress={() => setShowSearchModal(true)}
+          activeOpacity={0.7}
+          disabled={sheetIndex >= 2}
+        >
+          <MaterialIcons name="search" size={24} color={theme.subtext} />
+        </TouchableOpacity>
+
+        <Modal
+          visible={showSearchModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowSearchModal(false)}
+        >
+          <TouchableOpacity
+            style={{ flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.7)', justifyContent: 'flex-start', paddingTop: 90, paddingHorizontal: 20 }}
+            activeOpacity={1}
+            onPress={() => setShowSearchModal(false)}
+          >
+            <TouchableOpacity
+              activeOpacity={1}
+              style={{ width: '100%', maxWidth: 520, alignSelf: 'center', backgroundColor: theme.card, borderRadius: 18, padding: 16, elevation: 16 }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <MaterialIcons name="search" size={22} color={theme.subtext} />
+                <TextInput
+                  autoFocus
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  onSubmitEditing={() => searchCities()}
+                  placeholder="Search a city or destination"
+                  placeholderTextColor={theme.subtext}
+                  returnKeyType="search"
+                  style={{ flex: 1, color: theme.text, fontSize: 16, paddingVertical: 10 }}
+                />
+                {isSearching && <ActivityIndicator size="small" color={theme.primary} />}
+              </View>
+
+              {searchResults.map(result => (
+                <TouchableOpacity
+                  key={result.id}
+                  onPress={() => selectSearchResult(result.coords)}
+                  style={{ paddingVertical: 14, borderTopWidth: 1, borderTopColor: theme.border }}
+                >
+                  <Text style={{ color: theme.text, fontSize: 15 }}>{result.label}</Text>
+                </TouchableOpacity>
+              ))}
+
+              {!isSearching && searchQuery.trim().length >= 2 && searchResults.length === 0 && (
+                <Text style={{ color: theme.subtext, fontSize: 15, paddingTop: 14 }}>
+                  No places found for this search.
+                </Text>
+              )}
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </Modal>
 
         <TouchableOpacity
           style={[

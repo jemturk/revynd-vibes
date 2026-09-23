@@ -40,20 +40,19 @@ public class MapboxProperties {
 
     public String getCategoryString() {
         if (poiCategory != null && !poiCategory.isEmpty()) {
-            // Map the API categories cleanly to short vibe names
-            String category = poiCategory.get(0);
-            if (category.contains("skate") || category.contains("park")) {
+            String categories = String.join(" ", poiCategory).toLowerCase();
+            if (categories.contains("skate") || categories.contains("skateboard")) {
                 return "Skate Spot";
-            } else if (category.contains("coffee") || category.contains("cafe")) {
+            } else if (categories.contains("coffee") || categories.contains("cafe")) {
                 return "Cafe";
-            } else if (category.contains("bar") || category.contains("nightlife") || category.contains("club") || category.contains("pub")) {
+            } else if (categories.contains("bar") || categories.contains("nightlife") || categories.contains("club") || categories.contains("pub")) {
                 return "Bar";
-            } else if (category.contains("restaurant") || category.contains("food")) {
+            } else if (categories.contains("restaurant") || categories.contains("food")) {
                 return "Restaurant";
-            } else if (category.contains("tennis")) {
+            } else if (categories.contains("tennis")) {
                 return "Tennis";
             }
-            // Capitalize first letter of unknown categories as a fallback
+            String category = poiCategory.get(0);
             return category.substring(0, 1).toUpperCase() + category.substring(1);
         }
         return "Spot";
