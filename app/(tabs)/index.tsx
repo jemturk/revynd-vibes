@@ -23,6 +23,13 @@ const VIBE_TAGS_BY_CATEGORY: Record<string, string[]> = {
 };
 
 const ALL_CATEGORIES = Object.keys(VIBE_TAGS_BY_CATEGORY).filter(c => c !== 'default');
+const CATEGORY_COLORS: Record<string, string> = {
+  'Skate Spot': '#EC4899',
+  Cafe: '#D97706',
+  Bar: '#8B5CF6',
+  Restaurant: '#3B82F6',
+  Tennis: '#22C55E',
+};
 
 const API_URL = 'https://revynd-api-939729691035.us-east1.run.app';
 const MAPBOX_PUBLIC_TOKEN = Constants.expoConfig?.extra?.mapboxPublicToken || '';
@@ -37,6 +44,12 @@ type SpotFeature = Feature<Point, {
   intensity: number;
   isSaved: boolean;
 }>;
+
+type SearchPlace = {
+  id: string;
+  label: string;
+  coords: [number, number];
+};
 
 const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
   const R = 6371e3;
@@ -78,7 +91,8 @@ export default function MapScreen() {
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<Array<{ id: string; label: string; coords: [number, number] }>>([]);
+  const [searchResults, setSearchResults] = useState<SearchPlace[]>([]);
+  const [recentSearches, setRecentSearches] = useState<SearchPlace[]>([]);
   const [isSearching, setIsSearching] = useState(false);
 
   const [alertConfig, setAlertConfig] = useState<{ msg: string; type: 'error' | 'warning' | 'success' | null }>({ msg: '', type: null });
@@ -92,6 +106,9 @@ export default function MapScreen() {
 
   const [lastCheckIns, setLastCheckIns] = useState<Record<string, number>>({});
   const [cooldownRemaining, setCooldownRemaining] = useState<number>(0);
+  const activeFilterColor = selectedCategoryFilter
+    ? CATEGORY_COLORS[selectedCategoryFilter] || '#FB923C'
+    : theme.card;
 
   // Category Color Palette Mapbox Expression
   const categoryColorMatch = [
@@ -411,7 +428,27 @@ export default function MapScreen() {
     return () => clearTimeout(timeout);
   }, [searchQuery, showSearchModal]);
 
-  const selectSearchResult = (coords: [number, number]) => {
+  useEffect(() => {
+    if (!showSearchModal) return;
+
+    AsyncStorage.getItem('recent_map_searches')
+      .then(stored => {
+        if (stored) setRecentSearches(JSON.parse(stored));
+      })
+      .catch(error => console.error('Failed to load recent searches:', error));
+  }, [showSearchModal]);
+
+  const selectSearchResult = (coords: [number, number], label?: string, id?: string) => {
+    if (label) {
+      const nextRecentSearches = [
+        { id: id || label, label, coords },
+        ...recentSearches.filter(search => search.label !== label),
+      ].slice(0, 3);
+      setRecentSearches(nextRecentSearches);
+      AsyncStorage.setItem('recent_map_searches', JSON.stringify(nextRecentSearches))
+        .catch(error => console.error('Failed to save recent search:', error));
+    }
+
     setShowSearchModal(false);
     setSearchResults([]);
     setSearchQuery('');
@@ -931,12 +968,29 @@ export default function MapScreen() {
               {searchResults.map(result => (
                 <TouchableOpacity
                   key={result.id}
-                  onPress={() => selectSearchResult(result.coords)}
+                  onPress={() => selectSearchResult(result.coords, result.label, result.id)}
                   style={{ paddingVertical: 14, borderTopWidth: 1, borderTopColor: theme.border }}
                 >
                   <Text style={{ color: theme.text, fontSize: 15 }}>{result.label}</Text>
                 </TouchableOpacity>
               ))}
+
+              {searchQuery.trim().length < 2 && recentSearches.length > 0 && (
+                <>
+                  <Text style={{ color: theme.subtext, fontSize: 13, fontWeight: '700', paddingTop: 14, paddingBottom: 4 }}>
+                    Recent searches
+                  </Text>
+                  {recentSearches.map(result => (
+                    <TouchableOpacity
+                      key={result.id}
+                      onPress={() => selectSearchResult(result.coords, result.label, result.id)}
+                      style={{ paddingVertical: 12, borderTopWidth: 1, borderTopColor: theme.border }}
+                    >
+                      <Text style={{ color: theme.text, fontSize: 15 }}>{result.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </>
+              )}
 
               {!isSearching && searchQuery.trim().length >= 2 && searchResults.length === 0 && (
                 <Text style={{ color: theme.subtext, fontSize: 15, paddingTop: 14 }}>
@@ -953,7 +1007,7 @@ export default function MapScreen() {
             {
               bottom: buttonBottom + 128,
               opacity: sheetIndex >= 2 ? 0 : 1,
-              backgroundColor: selectedCategoryFilter ? theme.primary : theme.card
+              backgroundColor: selectedCategoryFilter ? activeFilterColor : theme.card
             }
           ]}
           onPress={() => setShowFilterModal(true)}
@@ -1025,7 +1079,7 @@ export default function MapScreen() {
             {
               bottom: buttonBottom + 64,
               opacity: sheetIndex >= 2 ? 0 : 1,
-              backgroundColor: theme.primary
+              backgroundColor: theme.card
             }
           ]}
           onPress={handleRefresh}
@@ -1033,9 +1087,9 @@ export default function MapScreen() {
           activeOpacity={0.7}
         >
           {isRefreshing ? (
-            <ActivityIndicator size="small" color="white" />
+            <ActivityIndicator size="small" color={theme.primary} />
           ) : (
-            <MaterialIcons name="refresh" size={24} color="white" />
+            <MaterialIcons name="refresh" size={24} color={theme.subtext} />
           )}
         </TouchableOpacity>
 
