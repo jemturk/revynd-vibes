@@ -61,6 +61,7 @@ export default function MapScreen() {
 
   const [selectedSpot, setSelectedSpot] = useState<SpotFeature | null>(null);
   const [userCoords, setUserCoords] = useState<[number, number] | null>(null);
+  const [initialMapCoords, setInitialMapCoords] = useState<[number, number] | null>(null);
   const [sheetIndex, setSheetIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -73,6 +74,10 @@ export default function MapScreen() {
   const [alertConfig, setAlertConfig] = useState<{ msg: string; type: 'error' | 'warning' | 'success' | null }>({ msg: '', type: null });
   const slideAnim = useRef(new Animated.Value(-100)).current; // Start off-screen
   const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const fetchControllerRef = useRef<AbortController | null>(null);
+  const lastFetchedCoordsRef = useRef<[number, number] | null>(null);
+  const fetchRequestIdRef = useRef(0);
+  const suppressCameraFetchUntilRef = useRef(0);
   const fetchingSpotIdRef = useRef<string | null>(null);
 
   const [lastCheckIns, setLastCheckIns] = useState<Record<string, number>>({});
@@ -121,6 +126,12 @@ export default function MapScreen() {
 
   const centerOnUser = () => {
     if (userCoords && cameraRef.current) {
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+      }
+      suppressCameraFetchUntilRef.current = Date.now() + 1500;
+      lastFetchedCoordsRef.current = null;
+      fetchSpots(userCoords);
       cameraRef.current.setCamera({
         centerCoordinate: userCoords,
         zoomLevel: 14,
@@ -279,10 +290,23 @@ export default function MapScreen() {
   });
 
   const fetchSpots = async (coords?: [number, number]) => {
+    const activeCoords = coords || userCoords || NYC_COORDS;
+    const lastFetchedCoords = lastFetchedCoordsRef.current;
+    if (lastFetchedCoords && getDistance(
+      lastFetchedCoords[1], lastFetchedCoords[0], activeCoords[1], activeCoords[0]
+    ) < 300) {
+      return;
+    }
+
+    fetchControllerRef.current?.abort();
+    const controller = new AbortController();
+    fetchControllerRef.current = controller;
+    const requestId = ++fetchRequestIdRef.current;
+
     try {
-      const activeCoords = coords || userCoords || NYC_COORDS;
       const response = await fetch(`${API_URL}/api/spots/explore?lat=${activeCoords[1]}&lng=${activeCoords[0]}&categories=bar,cafe,coffee,restaurant,tennis_courts,skatepark`, {
         headers: await buildAuthHeaders(),
+        signal: controller.signal,
       });
 
       const text = await response.text();
@@ -295,6 +319,9 @@ export default function MapScreen() {
       if (!Array.isArray(data)) {
         throw new Error('Unexpected spot payload format from backend.');
       }
+
+      if (requestId !== fetchRequestIdRef.current) return;
+      lastFetchedCoordsRef.current = activeCoords;
 
       const features: SpotFeature[] = data.map((spot: any) => ({
         type: 'Feature',
@@ -322,6 +349,7 @@ export default function MapScreen() {
         };
       });
     } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') return;
       console.error("Backend fetch failed:", error);
     } finally {
       setIsLoading(false);
@@ -331,7 +359,6 @@ export default function MapScreen() {
 
   useEffect(() => {
     AsyncStorage.setItem('last_viewed_spot', '');
-    fetchSpots();
 
     const loadCheckIns = async () => {
       try {
@@ -561,7 +588,16 @@ export default function MapScreen() {
 
     (async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') return;
+      if (status !== 'granted') {
+        setInitialMapCoords(NYC_COORDS);
+        fetchSpots(NYC_COORDS);
+        cameraRef.current?.setCamera({
+          centerCoordinate: NYC_COORDS,
+          zoomLevel: 16,
+          animationDuration: 0,
+        });
+        return;
+      }
 
       try {
         const location = await Location.getCurrentPositionAsync({});
@@ -570,6 +606,7 @@ export default function MapScreen() {
           location.coords.latitude,
         ];
         setUserCoords(coords);
+        setInitialMapCoords(coords);
         fetchSpots(coords);
 
         const reverseCoords = { latitude: coords[1], longitude: coords[0] };
@@ -585,6 +622,13 @@ export default function MapScreen() {
         });
       } catch (e) {
         console.error("Initial position retrieval failed", e);
+        setInitialMapCoords(NYC_COORDS);
+        fetchSpots(NYC_COORDS);
+        cameraRef.current?.setCamera({
+          centerCoordinate: NYC_COORDS,
+          zoomLevel: 16,
+          animationDuration: 0,
+        });
       }
 
       try {
@@ -661,6 +705,8 @@ export default function MapScreen() {
             bottomSheetRef.current?.snapToIndex(0);
           }}
           onCameraChanged={(e: any) => {
+            if (Date.now() < suppressCameraFetchUntilRef.current) return;
+
             if (e?.properties?.center) {
               const center = e.properties.center as [number, number];
 
@@ -761,7 +807,7 @@ export default function MapScreen() {
           <Mapbox.Camera
             ref={cameraRef}
             defaultSettings={{
-              centerCoordinate: NYC_COORDS,
+              centerCoordinate: initialMapCoords || NYC_COORDS,
               zoomLevel: 16,
             }}
           />

@@ -13,4 +13,4 @@ COPY --from=build /app/target/*.jar app.jar
 EXPOSE 8080
 
 # Run using your production configuration settings
-ENTRYPOINT ["java", "-jar", "-Dspring.profiles.active=prod", "app.jar"]
+ENTRYPOINT ["java", "-Dspring.profiles.active=prod", "-jar", "app.jar"]

@@ -8,6 +8,16 @@
       "developmentClient": true,
       "distribution": "internal"
     },
+    "appetize": {
+      "distribution": "internal",
+      "environment": "preview",
+      "ios": {
+        "simulator": true
+      },
+      "env": {
+        "NODE_ENV": "production"
+      }
+    },
     "preview": {
       "distribution": "internal",
       "android": {
