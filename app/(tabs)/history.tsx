@@ -134,30 +134,24 @@ const HistoryScreen = () => {
       fontWeight: '700',
     },
     listContent: { paddingBottom: 120 },
-    historyCard: {
-      backgroundColor: theme.card,
-      borderRadius: 20,
-      paddingVertical: 20,
-      paddingHorizontal: 16,
-      borderWidth: 1,
-      borderColor: theme.border,
+    historyRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'space-between',
+      paddingVertical: 14,
+      borderTopWidth: 1,
+      borderTopColor: theme.border,
+      backgroundColor: theme.background,
     },
     checkboxWrapper: {
       marginRight: 12,
       justifyContent: 'center',
       alignItems: 'center',
     },
-    cardLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-    iconCircle: {
-      width: 44,
-      height: 44,
-      borderRadius: 22,
-      backgroundColor: theme.border,
-      justifyContent: 'center',
-      alignItems: 'center',
+    historyDot: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      backgroundColor: '#FB923C',
       marginRight: 12,
     },
     spotName: {
@@ -169,30 +163,22 @@ const HistoryScreen = () => {
     timeText: {
       fontSize: 11,
       color: theme.subtext,
-      marginTop: 6,
+      marginTop: 2,
+      marginBottom: 6,
       fontWeight: '600',
     },
-    intensityWrapper: { alignItems: 'flex-end', marginLeft: 10 },
-    miniBarTrack: {
-      width: 36,
+    historyBarTrack: {
       height: 6,
+      width: '100%',
       backgroundColor: theme.border,
       borderRadius: 3,
       overflow: 'hidden',
     },
-    miniBarFill: { height: '100%', backgroundColor: '#FB923C' },
+    historyBarFill: { height: '100%', backgroundColor: '#FB923C', borderRadius: 3 },
     emptyState: { alignItems: 'center', marginTop: 100 },
     emptyText: { color: theme.subtext, marginTop: 12, fontSize: 16, fontWeight: '500' },
     itemWrapper: {
-      marginBottom: 12,
-      marginHorizontal: 21,
-    },
-    shadowWrapper: {
-      shadowColor: theme.text,
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.08,
-      shadowRadius: 4,
-      elevation: 2,
+      marginHorizontal: 20,
     },
     // Swipe action styles
     actionsContainer: {
@@ -660,11 +646,10 @@ const HistoryScreen = () => {
           <TouchableOpacity
             activeOpacity={isSelectMode ? 0.8 : 1}
             onPress={() => isSelectMode ? toggleSelectItem(item.id) : null}
-            style={styles.shadowWrapper}
           >
             <View style={[
-              styles.historyCard,
-              isSelected && { borderColor: theme.primary, backgroundColor: theme.cardLighter }
+              styles.historyRow,
+              isSelected && { backgroundColor: theme.cardLighter }
             ]}>
               {isSelectMode && (
                 <View style={styles.checkboxWrapper}>
@@ -675,28 +660,21 @@ const HistoryScreen = () => {
                   />
                 </View>
               )}
-              <View style={styles.cardLeft}>
-                <View style={styles.iconCircle}>
-                  <MaterialIcons name="place" size={20} color={theme.subtext} />
-                </View>
-                <View>
-                  <Text style={styles.spotName}>{item.spotName}</Text>
-                  <Text style={styles.vibeType}>{item.vibeTag ? `${item.vibeTag} Vibe` : 'Checked In'}</Text>
-                  <Text style={styles.timeText}>
-                    {date.toLocaleDateString()} •{' '}
-                    {date.toLocaleTimeString([], {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.intensityWrapper}>
-                <View style={styles.miniBarTrack}>
+              <View style={styles.historyDot} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.spotName} numberOfLines={1}>{item.spotName}</Text>
+                <Text style={styles.vibeType} numberOfLines={1}>{item.vibeTag ? `${item.vibeTag} Vibe` : 'Checked In'}</Text>
+                <Text style={styles.timeText}>
+                  {date.toLocaleDateString()} •{' '}
+                  {date.toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </Text>
+                <View style={styles.historyBarTrack}>
                   <View
                     style={[
-                      styles.miniBarFill,
+                      styles.historyBarFill,
                       { width: `${Math.min(Math.max(percentage, 0), 100)}%` },
                     ]}
                   />

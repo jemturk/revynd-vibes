@@ -253,6 +253,7 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
+        tabBarShowLabel: false,
         tabBarStyle: {
           backgroundColor: theme.cardLighter,
           borderTopColor: theme.border,
@@ -282,6 +283,19 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="search"
+        options={{
+          title: 'Search',
+          tabBarIcon: ({ color }) => <MaterialIcons name="search" size={26} color={color} />,
+        }}
+        listeners={{
+          tabPress: (e: any) => {
+            e.preventDefault();
+            router.push('/(tabs)/?openSearch=true');
+          },
+        }}
+      />
+      <Tabs.Screen
         name="history"
         options={{
           title: 'History',
@@ -298,12 +312,11 @@ export default function TabLayout() {
               <Image
                 source={{ uri: user.profilePicture }}
                 style={{
-                  width: 38,
-                  height: 38,
-                  borderRadius: 19,
+                  width: 26,
+                  height: 26,
+                  borderRadius: 13,
                   borderWidth: focused ? 2 : 1,
                   borderColor: focused ? '#FB923C' : theme.border,
-                  marginTop: 6,
                 }}
               />
             ),

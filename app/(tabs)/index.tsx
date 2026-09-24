@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { StyleSheet, View, Text, Alert, TouchableOpacity, ActivityIndicator, Animated, Easing, StatusBar, ScrollView, Modal, TextInput } from 'react-native';
-import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
+import BottomSheet, { BottomSheetView, BottomSheetFlatList } from '@gorhom/bottom-sheet';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Mapbox from '@rnmapbox/maps';
 import type { Feature, FeatureCollection, Point } from 'geojson';
@@ -30,6 +30,8 @@ const CATEGORY_COLORS: Record<string, string> = {
   Restaurant: '#3B82F6',
   Tennis: '#22C55E',
 };
+
+const CHECKIN_RADIUS_METERS = 110000;
 
 const API_URL = 'https://revynd-api-939729691035.us-east1.run.app';
 const MAPBOX_PUBLIC_TOKEN = Constants.expoConfig?.extra?.mapboxPublicToken || '';
@@ -83,6 +85,7 @@ export default function MapScreen() {
   const snapPoints = useMemo(() => ['14%', '40%', '60%', '90%'], []);
 
   const [selectedSpot, setSelectedSpot] = useState<SpotFeature | null>(null);
+  const [mapBounds, setMapBounds] = useState<{ ne: [number, number]; sw: [number, number] } | null>(null);
   const [userCoords, setUserCoords] = useState<[number, number] | null>(null);
   const [initialMapCoords, setInitialMapCoords] = useState<[number, number] | null>(null);
   const [sheetIndex, setSheetIndex] = useState(0);
@@ -91,7 +94,7 @@ export default function MapScreen() {
   const [currentCity, setCurrentCity] = useState<string | null>(null);
   const [isCheckingIn, setIsCheckingIn] = useState(false);
   const [showVibeSelection, setShowVibeSelection] = useState(false);
-  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string | null>(null);
+  const [selectedCategoryFilters, setSelectedCategoryFilters] = useState<string[]>([]);
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -109,12 +112,26 @@ export default function MapScreen() {
   const fetchRequestIdRef = useRef(0);
   const suppressCameraFetchUntilRef = useRef(0);
   const fetchingSpotIdRef = useRef<string | null>(null);
+  const homeCityRef = useRef<string | null>(null);
+  const lastCityCoordsRef = useRef<[number, number] | null>(null);
+  const homeFixCorrectedRef = useRef(false);
+  const initialFixCoordsRef = useRef<[number, number] | null>(null);
 
   const [lastCheckIns, setLastCheckIns] = useState<Record<string, number>>({});
   const [cooldownRemaining, setCooldownRemaining] = useState<number>(0);
-  const activeFilterColor = selectedCategoryFilter
-    ? CATEGORY_COLORS[selectedCategoryFilter] || '#FB923C'
-    : theme.card;
+  const activeFilterColor = selectedCategoryFilters.length === 1
+    ? CATEGORY_COLORS[selectedCategoryFilters[0]] || '#FB923C'
+    : theme.primary;
+
+  const toggleCategoryFilter = (cat: string) => {
+    setSelectedCategoryFilters(prev =>
+      prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat]
+    );
+  };
+
+  const categoryFilterExpression = selectedCategoryFilters.length > 0
+    ? (['in', ['get', 'category'], ['literal', selectedCategoryFilters]] as any)
+    : null;
 
   // Category Color Palette Mapbox Expression
   const categoryColorMatch = [
@@ -164,6 +181,11 @@ export default function MapScreen() {
       }
       suppressCameraFetchUntilRef.current = Date.now() + 1500;
       lastFetchedCoordsRef.current = null;
+      setSelectedCategoryFilters([]);
+      setSelectedSpot(null);
+      setCurrentCity(homeCityRef.current);
+      lastCityCoordsRef.current = userCoords;
+      bottomSheetRef.current?.snapToIndex(0);
       fetchSpots(userCoords);
       cameraRef.current.setCamera({
         centerCoordinate: userCoords,
@@ -322,10 +344,10 @@ export default function MapScreen() {
     features: [],
   });
 
-  const fetchSpots = async (coords?: [number, number]) => {
+  const fetchSpots = async (coords?: [number, number], force = false) => {
     const activeCoords = coords || userCoords || NYC_COORDS;
     const lastFetchedCoords = lastFetchedCoordsRef.current;
-    if (lastFetchedCoords && getDistance(
+    if (!force && lastFetchedCoords && getDistance(
       lastFetchedCoords[1], lastFetchedCoords[0], activeCoords[1], activeCoords[0]
     ) < 300) {
       return;
@@ -390,6 +412,27 @@ export default function MapScreen() {
     }
   };
 
+  const updateCityForCoords = async (coords: [number, number]) => {
+    if (!MAPBOX_PUBLIC_TOKEN) return;
+
+    const lastCoords = lastCityCoordsRef.current;
+    if (lastCoords && getDistance(lastCoords[1], lastCoords[0], coords[1], coords[0]) < 2000) {
+      return;
+    }
+    lastCityCoordsRef.current = coords;
+
+    try {
+      const response = await fetch(
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${coords[0]},${coords[1]}.json?access_token=${MAPBOX_PUBLIC_TOKEN}&types=place&limit=1`
+      );
+      const data = await response.json();
+      const city = data?.features?.[0]?.text;
+      if (city) setCurrentCity(city);
+    } catch (error) {
+      console.error('Reverse geocode for map center failed:', error);
+    }
+  };
+
   const searchCities = async (queryValue = searchQuery) => {
     const query = queryValue.trim();
     if (query.length < 2 || !MAPBOX_PUBLIC_TOKEN) {
@@ -444,6 +487,13 @@ export default function MapScreen() {
       .catch(error => console.error('Failed to load recent searches:', error));
   }, [showSearchModal]);
 
+  const clearRecentSearches = () => {
+    setRecentSearches([]);
+    AsyncStorage.removeItem('recent_map_searches').catch(error =>
+      console.error('Failed to clear recent searches:', error)
+    );
+  };
+
   const selectSearchResult = (coords: [number, number], label?: string, id?: string) => {
     if (label) {
       const nextRecentSearches = [
@@ -483,11 +533,16 @@ export default function MapScreen() {
       .finally(() => setIsLoadingPreview(false));
   };
 
-  const exploreDestination = () => {
+  const exploreDestination = (category?: string) => {
     if (!destinationPreview) return;
 
-    const { coords } = destinationPreview;
+    const { coords, label } = destinationPreview;
     setDestinationPreview(null);
+    setSelectedCategoryFilters(category ? [category] : []);
+    setSelectedSpot(null);
+    setCurrentCity(label.split(',')[0].trim());
+    lastCityCoordsRef.current = coords;
+    bottomSheetRef.current?.snapToIndex(0);
     setInitialMapCoords(coords);
     lastFetchedCoordsRef.current = null;
     suppressCameraFetchUntilRef.current = Date.now() + 1500;
@@ -512,6 +567,13 @@ export default function MapScreen() {
     };
     loadCheckIns();
   }, []);
+
+  useEffect(() => {
+    if (params.openSearch === 'true') {
+      setShowSearchModal(true);
+      router.replace('/(tabs)/');
+    }
+  }, [params.openSearch]);
 
   useEffect(() => {
     if (params.selectedSpotId) {
@@ -641,10 +703,26 @@ export default function MapScreen() {
   const handleRefresh = (coords?: any) => {
     setIsRefreshing(true);
     const targetCoords = (coords && Array.isArray(coords)) ? coords : (userCoords || undefined);
-    fetchSpots(targetCoords as [number, number] | undefined);
+    fetchSpots(targetCoords as [number, number] | undefined, true);
   };
 
   const buttonBottom = sheetIndex === 0 ? 150 : sheetIndex === 1 ? 300 : -150;
+
+  const sortedSpots = useMemo(() => {
+    let visible = selectedCategoryFilters.length > 0
+      ? featureCollection.features.filter(f => selectedCategoryFilters.includes(f.properties.category))
+      : featureCollection.features;
+
+    if (mapBounds) {
+      const { ne, sw } = mapBounds;
+      visible = visible.filter(f => {
+        const [lng, lat] = f.geometry.coordinates;
+        return lng >= sw[0] && lng <= ne[0] && lat >= sw[1] && lat <= ne[1];
+      });
+    }
+
+    return [...visible].sort((a, b) => b.properties.intensity - a.properties.intensity);
+  }, [featureCollection, selectedCategoryFilters, mapBounds]);
 
   const handleCheckIn = async (selectedTag: string) => {
     if (!userCoords || !selectedSpot) {
@@ -661,7 +739,7 @@ export default function MapScreen() {
       spotCoords[1], spotCoords[0]
     );
 
-    if (distance > 110000) {
+    if (distance > CHECKIN_RADIUS_METERS) {
       triggerAlert(`You're ${Math.round(distance)}m away. Get closer to check in!`, 'warning');
       safeHaptic(Haptics.ImpactFeedbackStyle.Medium);
       return;
@@ -739,11 +817,12 @@ export default function MapScreen() {
       }
 
       try {
-        const location = await Location.getCurrentPositionAsync({});
+        const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
         const coords: [number, number] = [
           location.coords.longitude,
           location.coords.latitude,
         ];
+        initialFixCoordsRef.current = coords;
         setUserCoords(coords);
         setInitialMapCoords(coords);
         fetchSpots(coords);
@@ -751,7 +830,10 @@ export default function MapScreen() {
         const reverseCoords = { latitude: coords[1], longitude: coords[0] };
         const address = await Location.reverseGeocodeAsync(reverseCoords);
         if (address.length > 0) {
-          setCurrentCity(address[0].city || address[0].subregion);
+          const city = address[0].city || address[0].subregion;
+          homeCityRef.current = city ?? null;
+          lastCityCoordsRef.current = coords;
+          setCurrentCity(city);
         }
 
         cameraRef.current?.setCamera({
@@ -783,6 +865,28 @@ export default function MapScreen() {
               location.coords.latitude,
             ];
             setUserCoords(coords);
+
+            const initialCoords = initialFixCoordsRef.current;
+            if (!homeFixCorrectedRef.current && initialCoords) {
+              const driftMeters = getDistance(
+                initialCoords[1], initialCoords[0], coords[1], coords[0]
+              );
+              if (driftMeters > 3000) {
+                homeFixCorrectedRef.current = true;
+                const staleCity = homeCityRef.current;
+                Location.reverseGeocodeAsync({ latitude: coords[1], longitude: coords[0] })
+                  .then(address => {
+                    if (address.length === 0) return;
+                    const city = address[0].city || address[0].subregion || null;
+                    homeCityRef.current = city;
+                    lastCityCoordsRef.current = coords;
+                    setCurrentCity(current => current === staleCity ? city : current);
+                  })
+                  .catch(error => console.error('Corrected reverse geocode failed:', error));
+              } else {
+                homeFixCorrectedRef.current = true;
+              }
+            }
           }
         );
       } catch (e) {
@@ -828,6 +932,10 @@ export default function MapScreen() {
             bottomSheetRef.current?.snapToIndex(0);
           }}
           onCameraChanged={(e: any) => {
+            if (e?.properties?.bounds) {
+              setMapBounds(e.properties.bounds);
+            }
+
             if (Date.now() < suppressCameraFetchUntilRef.current) return;
 
             if (e?.properties?.center) {
@@ -841,6 +949,7 @@ export default function MapScreen() {
               // Set a new timeout to debounce the fetch
               fetchTimeoutRef.current = setTimeout(() => {
                 fetchSpots(center);
+                if (!selectedSpot) updateCityForCoords(center);
               }, 500);
             }
           }}
@@ -864,8 +973,8 @@ export default function MapScreen() {
             <Mapbox.Animated.CircleLayer
               id="spots-pulse-wave"
               filter={
-                selectedCategoryFilter
-                  ? ['all', ['>', ['get', 'intensity'], 0], ['==', ['get', 'category'], selectedCategoryFilter]]
+                categoryFilterExpression
+                  ? ['all', ['>', ['get', 'intensity'], 0], categoryFilterExpression]
                   : ['>', ['get', 'intensity'], 0]
               }
               style={{
@@ -881,7 +990,7 @@ export default function MapScreen() {
             {/* LAYER 2: Core Base Glow (Static ambient blur scaled by backend intensity) */}
             <Mapbox.CircleLayer
               id="spots-ambient-glow"
-              filter={selectedCategoryFilter ? ['==', ['get', 'category'], selectedCategoryFilter] : undefined}
+              filter={categoryFilterExpression || undefined}
               style={{
                 circleRadius: [
                   'case',
@@ -904,7 +1013,7 @@ export default function MapScreen() {
             {/* LAYER 3: The Crisp Anchor Pin (Central structural target dot) */}
             <Mapbox.CircleLayer
               id="spots-anchor"
-              filter={selectedCategoryFilter ? ['==', ['get', 'category'], selectedCategoryFilter] : undefined}
+              filter={categoryFilterExpression || undefined}
               style={{
                 circleRadius: [
                   'case',
@@ -935,22 +1044,6 @@ export default function MapScreen() {
             }}
           />
         </Mapbox.MapView>
-
-        <TouchableOpacity
-          style={[
-            styles.floatingButton,
-            {
-              bottom: buttonBottom + 192,
-              opacity: sheetIndex >= 2 ? 0 : 1,
-              backgroundColor: theme.card
-            }
-          ]}
-          onPress={() => setShowSearchModal(true)}
-          activeOpacity={0.7}
-          disabled={sheetIndex >= 2}
-        >
-          <MaterialIcons name="search" size={24} color={theme.subtext} />
-        </TouchableOpacity>
 
         <Modal
           visible={showSearchModal}
@@ -994,9 +1087,24 @@ export default function MapScreen() {
 
               {searchQuery.trim().length < 2 && recentSearches.length > 0 && (
                 <>
-                  <Text style={{ color: theme.subtext, fontSize: 13, fontWeight: '700', paddingTop: 14, paddingBottom: 4 }}>
-                    Recent searches
-                  </Text>
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      paddingTop: 14,
+                      paddingBottom: 4,
+                    }}
+                  >
+                    <Text style={{ color: theme.subtext, fontSize: 13, fontWeight: '700' }}>
+                      Recent searches
+                    </Text>
+                    <TouchableOpacity onPress={clearRecentSearches}>
+                      <Text style={{ color: theme.primary, fontSize: 13, fontWeight: '700' }}>
+                        Clear
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
                   {recentSearches.map(result => (
                     <TouchableOpacity
                       key={result.id}
@@ -1020,7 +1128,7 @@ export default function MapScreen() {
 
         <Modal
           visible={destinationPreview !== null}
-          transparent
+          transparent={false}
           animationType="slide"
           onRequestClose={() => setDestinationPreview(null)}
         >
@@ -1051,15 +1159,19 @@ export default function MapScreen() {
                   </Text>
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 22 }}>
                     {['Bar', 'Restaurant', 'Cafe', 'Tennis', 'Skate Spot'].map(category => (
-                      <View key={category} style={{ backgroundColor: `${CATEGORY_COLORS[category] || '#FB923C'}18`, borderRadius: 12, paddingVertical: 9, paddingHorizontal: 12 }}>
+                      <TouchableOpacity
+                        key={category}
+                        onPress={() => exploreDestination(category)}
+                        style={{ backgroundColor: `${CATEGORY_COLORS[category] || '#FB923C'}18`, borderRadius: 12, paddingVertical: 9, paddingHorizontal: 12 }}
+                      >
                         <Text style={{ color: CATEGORY_COLORS[category] || theme.text, fontWeight: '700', fontSize: 13 }}>
-                          {destinationPreview?.counts[category] || 0} {category === 'Skate Spot' ? 'skate spots' : `${category.toLowerCase()}${category === 'Cafe' ? 's' : 's'}`}
+                          {destinationPreview?.counts[category] || 0} {category === 'Skate Spot' ? 'skate spots' : `${category.toLowerCase()}${category === 'Tennis' ? '' : 's'}`}
                         </Text>
-                      </View>
+                      </TouchableOpacity>
                     ))}
                   </View>
                   <TouchableOpacity
-                    onPress={exploreDestination}
+                    onPress={() => exploreDestination()}
                     style={{ backgroundColor: theme.primary, borderRadius: 14, paddingVertical: 15, alignItems: 'center' }}
                   >
                     <Text style={{ color: '#fff', fontWeight: '800', fontSize: 16 }}>Explore this vibe</Text>
@@ -1076,14 +1188,14 @@ export default function MapScreen() {
             {
               bottom: buttonBottom + 128,
               opacity: sheetIndex >= 2 ? 0 : 1,
-              backgroundColor: selectedCategoryFilter ? activeFilterColor : theme.card
+              backgroundColor: selectedCategoryFilters.length > 0 ? activeFilterColor : theme.card
             }
           ]}
           onPress={() => setShowFilterModal(true)}
           activeOpacity={0.7}
           disabled={sheetIndex >= 2}
         >
-          <MaterialIcons name="filter-list" size={24} color={selectedCategoryFilter ? '#fff' : theme.subtext} />
+          <MaterialIcons name="filter-list" size={24} color={selectedCategoryFilters.length > 0 ? '#fff' : theme.subtext} />
         </TouchableOpacity>
 
         {/* Filter Modal */}
@@ -1102,30 +1214,35 @@ export default function MapScreen() {
               activeOpacity={1}
               style={{ width: '100%', maxWidth: 420, backgroundColor: theme.card, borderRadius: 22, padding: 24, alignItems: 'center', elevation: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.18, shadowRadius: 20 }}
             >
+              <TouchableOpacity
+                onPress={() => setShowFilterModal(false)}
+                style={{ position: 'absolute', top: 16, right: 16, zIndex: 1, padding: 4 }}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <MaterialIcons name="close" size={22} color={theme.subtext} />
+              </TouchableOpacity>
               <Text style={{ fontSize: 20, fontWeight: '700', color: theme.text, marginBottom: 20 }}>Filter by Category</Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 10 }}>
                 <TouchableOpacity
-                  style={{ backgroundColor: selectedCategoryFilter === null ? theme.primary : theme.background, paddingVertical: 10, paddingHorizontal: 20, borderRadius: 20, borderWidth: 1, borderColor: selectedCategoryFilter === null ? theme.primary : theme.border }}
-                  onPress={() => { setSelectedCategoryFilter(null); setShowFilterModal(false); }}
+                  style={{ backgroundColor: selectedCategoryFilters.length === 0 ? theme.primary : theme.background, paddingVertical: 10, paddingHorizontal: 20, borderRadius: 20, borderWidth: 1, borderColor: selectedCategoryFilters.length === 0 ? theme.primary : theme.border }}
+                  onPress={() => { setSelectedCategoryFilters([]); setShowFilterModal(false); }}
                 >
-                  <Text style={{ color: selectedCategoryFilter === null ? '#fff' : theme.text, fontWeight: '600', fontSize: 15 }}>All</Text>
+                  <Text style={{ color: selectedCategoryFilters.length === 0 ? '#fff' : theme.text, fontWeight: '600', fontSize: 15 }}>All</Text>
                 </TouchableOpacity>
-                {ALL_CATEGORIES.map(cat => (
-                  <TouchableOpacity
-                    key={cat}
-                    style={{ backgroundColor: selectedCategoryFilter === cat ? theme.primary : theme.background, paddingVertical: 10, paddingHorizontal: 20, borderRadius: 20, borderWidth: 1, borderColor: selectedCategoryFilter === cat ? theme.primary : theme.border }}
-                    onPress={() => { setSelectedCategoryFilter(cat); setShowFilterModal(false); }}
-                  >
-                    <Text style={{ color: selectedCategoryFilter === cat ? '#fff' : theme.text, fontWeight: '600', fontSize: 15 }}>{cat}</Text>
-                  </TouchableOpacity>
-                ))}
+                {ALL_CATEGORIES.map(cat => {
+                  const catColor = CATEGORY_COLORS[cat] || '#FB923C';
+                  const isSelected = selectedCategoryFilters.includes(cat);
+                  return (
+                    <TouchableOpacity
+                      key={cat}
+                      style={{ backgroundColor: isSelected ? catColor : `${catColor}1F`, paddingVertical: 10, paddingHorizontal: 20, borderRadius: 20, borderWidth: 1, borderColor: isSelected ? catColor : `${catColor}55` }}
+                      onPress={() => toggleCategoryFilter(cat)}
+                    >
+                      <Text style={{ color: isSelected ? '#fff' : catColor, fontWeight: '600', fontSize: 15 }}>{cat}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
-              <TouchableOpacity
-                style={{ marginTop: 25, paddingVertical: 12, paddingHorizontal: 30, backgroundColor: theme.background, borderRadius: 14, borderWidth: 1, borderColor: theme.border }}
-                onPress={() => setShowFilterModal(false)}
-              >
-                <Text style={{ color: theme.text, fontWeight: '600', fontSize: 15 }}>Close</Text>
-              </TouchableOpacity>
             </TouchableOpacity>
           </TouchableOpacity>
         </Modal>
@@ -1170,113 +1287,168 @@ export default function MapScreen() {
           onChange={(index) => setSheetIndex(index)}
           onAnimate={(fromIndex, toIndex) => setSheetIndex(toIndex)}
         >
-          <BottomSheetView style={styles.contentContainer}>
-            {selectedSpot ? (() => {
-              const liveSpot = featureCollection?.features.find((f) => {
-                if (f.properties.id === selectedSpot.properties.id) return true;
-                const dist = getDistance(
-                  f.geometry.coordinates[1], f.geometry.coordinates[0],
-                  selectedSpot.geometry.coordinates[1], selectedSpot.geometry.coordinates[0]
-                );
-                return dist < 10;
-              });
-              const displaySpot = liveSpot || selectedSpot;
+          {selectedSpot ? (
+            <BottomSheetView style={styles.contentContainer}>
+              {(() => {
+                const liveSpot = featureCollection?.features.find((f) => {
+                  if (f.properties.id === selectedSpot.properties.id) return true;
+                  const dist = getDistance(
+                    f.geometry.coordinates[1], f.geometry.coordinates[0],
+                    selectedSpot.geometry.coordinates[1], selectedSpot.geometry.coordinates[0]
+                  );
+                  return dist < 10;
+                });
+                const displaySpot = liveSpot || selectedSpot;
 
-              return (
-                <>
-                  <Text style={styles.title}>
-                    {displaySpot.properties.name} 🧭
-                  </Text>
-                  <Text style={styles.subtitle}>
-                    {displaySpot.properties.category} {displaySpot.properties.vibe ? `• ${displaySpot.properties.vibe}` : ''}
-                  </Text>
+                const distanceToSpot = userCoords
+                  ? getDistance(
+                      userCoords[1], userCoords[0],
+                      displaySpot.geometry.coordinates[1], displaySpot.geometry.coordinates[0]
+                    )
+                  : null;
+                const isTooFarToCheckIn = distanceToSpot !== null && distanceToSpot > CHECKIN_RADIUS_METERS;
 
-                  <View style={styles.spotCard}>
-                    <View style={styles.densityContainer}>
-                      <View style={styles.densityHeader}>
-                        <Text style={styles.densityLabel}>Vibe Crowd</Text>
-                      </View>
+                return (
+                  <>
+                    <Text style={styles.title}>
+                      {displaySpot.properties.name} 🧭
+                    </Text>
+                    <Text style={styles.subtitle}>
+                      {displaySpot.properties.category} {displaySpot.properties.vibe ? `• ${displaySpot.properties.vibe}` : ''}
+                    </Text>
 
-                      <View style={styles.barTrack}>
-                        <View
-                          style={[
-                            styles.barFill,
-                            { width: `${displaySpot.properties.intensity * 100}%` }
-                          ]}
-                        />
-                      </View>
-                    </View>
-
-                    {showVibeSelection ? (
-                      <View style={{ width: '100%', marginTop: 10 }}>
-                        <Text style={[styles.densityLabel, { marginBottom: 10, textAlign: 'center' }]}>What's the vibe right now?</Text>
-                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 10 }}>
-                          {(VIBE_TAGS_BY_CATEGORY[displaySpot.properties.category] || VIBE_TAGS_BY_CATEGORY['default']).map((tag) => (
-                            <TouchableOpacity
-                              key={tag}
-                              style={{ backgroundColor: theme.primary + '20', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20, borderWidth: 1, borderColor: theme.primary }}
-                              onPress={() => handleCheckIn(tag)}
-                            >
-                              <Text style={{ color: theme.primary, fontWeight: '600' }}>{tag}</Text>
-                            </TouchableOpacity>
-                          ))}
+                    <View style={styles.spotCard}>
+                      <View style={styles.densityContainer}>
+                        <View style={styles.densityHeader}>
+                          <Text style={styles.densityLabel}>Vibe Crowd</Text>
                         </View>
+
+                        <View style={styles.barTrack}>
+                          <View
+                            style={[
+                              styles.barFill,
+                              { width: `${displaySpot.properties.intensity * 100}%` }
+                            ]}
+                          />
+                        </View>
+                      </View>
+
+                      {showVibeSelection ? (
+                        <View style={{ width: '100%', marginTop: 10 }}>
+                          <Text style={[styles.densityLabel, { marginBottom: 10, textAlign: 'center' }]}>What's the vibe right now?</Text>
+                          <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 10 }}>
+                            {(VIBE_TAGS_BY_CATEGORY[displaySpot.properties.category] || VIBE_TAGS_BY_CATEGORY['default']).map((tag) => (
+                              <TouchableOpacity
+                                key={tag}
+                                style={{ backgroundColor: theme.primary + '20', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20, borderWidth: 1, borderColor: theme.primary }}
+                                onPress={() => handleCheckIn(tag)}
+                              >
+                                <Text style={{ color: theme.primary, fontWeight: '600' }}>{tag}</Text>
+                              </TouchableOpacity>
+                            ))}
+                          </View>
+                          <TouchableOpacity
+                            style={{ marginTop: 15, padding: 10 }}
+                            onPress={() => {
+                              setShowVibeSelection(false);
+                              bottomSheetRef.current?.snapToIndex(1);
+                            }}
+                          >
+                            <Text style={{ color: theme.subtext, textAlign: 'center', fontWeight: '500' }}>Cancel</Text>
+                          </TouchableOpacity>
+                        </View>
+                      ) : (
                         <TouchableOpacity
-                          style={{ marginTop: 15, padding: 10 }}
+                          style={[
+                            styles.checkInButton,
+                            cooldownRemaining > 0 && {
+                              backgroundColor: isDark ? 'rgba(13, 148, 136, 0.15)' : 'rgba(13, 148, 136, 0.12)',
+                              elevation: 0,
+                              shadowOpacity: 0
+                            },
+                            isTooFarToCheckIn && cooldownRemaining === 0 && {
+                              backgroundColor: theme.border,
+                              elevation: 0,
+                              shadowOpacity: 0
+                            }
+                          ]}
+                          disabled={cooldownRemaining > 0 || isTooFarToCheckIn}
                           onPress={() => {
-                            setShowVibeSelection(false);
-                            bottomSheetRef.current?.snapToIndex(1);
+                            setShowVibeSelection(true);
+                            bottomSheetRef.current?.snapToIndex(2);
                           }}
                         >
-                          <Text style={{ color: theme.subtext, textAlign: 'center', fontWeight: '500' }}>Cancel</Text>
+                          <Text style={[
+                            styles.buttonText,
+                            cooldownRemaining > 0 && { color: isDark ? 'rgba(45, 212, 191, 0.6)' : 'rgba(13, 148, 136, 0.6)' },
+                            isTooFarToCheckIn && cooldownRemaining === 0 && { color: theme.subtext }
+                          ]}>
+                            {cooldownRemaining > 0
+                              ? `Vibe Boosted (${cooldownRemaining}s)`
+                              : isTooFarToCheckIn
+                              ? "You're too far to check in"
+                              : 'Check In'}
+                          </Text>
                         </TouchableOpacity>
-                      </View>
-                    ) : (
-                      <TouchableOpacity
-                        style={[
-                          styles.checkInButton,
-                          cooldownRemaining > 0 && {
-                            backgroundColor: isDark ? 'rgba(13, 148, 136, 0.15)' : 'rgba(13, 148, 136, 0.12)',
-                            elevation: 0,
-                            shadowOpacity: 0
-                          }
-                        ]}
-                        disabled={cooldownRemaining > 0}
-                        onPress={() => {
-                          setShowVibeSelection(true);
-                          bottomSheetRef.current?.snapToIndex(2);
-                        }}
-                      >
-                        <Text style={[
-                          styles.buttonText,
-                          cooldownRemaining > 0 && { color: isDark ? 'rgba(45, 212, 191, 0.6)' : 'rgba(13, 148, 136, 0.6)' }
-                        ]}>
-                          {cooldownRemaining > 0 ? `Vibe Boosted (${cooldownRemaining}s)` : 'Check In'}
-                        </Text>
-                      </TouchableOpacity>
-                    )}
+                      )}
+                    </View>
+                  </>
+                );
+              })()}
+            </BottomSheetView>
+          ) : (
+            <BottomSheetFlatList
+              data={sheetIndex > 0 ? sortedSpots : []}
+              keyExtractor={(item) => String(item.properties.id)}
+              contentContainerStyle={[styles.contentContainer, { alignItems: 'stretch' }]}
+              ListHeaderComponent={
+                <View style={{ marginBottom: 5, alignItems: 'center' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Text style={styles.title}>
+                      Explore {currentCity || "the Area"}
+                    </Text>
+                    <MaterialIcons
+                      name="map"
+                      size={24}
+                      color={theme.primary}
+                      style={{ marginLeft: 8 }}
+                    />
                   </View>
-                </>
-              );
-            })() : (
-              <>
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 5 }}>
-                  <Text style={styles.title}>
-                    Explore {currentCity || "the Area"}
+                  <Text style={styles.subtitle}>
+                    {sheetIndex > 0 && sortedSpots.length > 0
+                      ? `${sortedSpots.length} spot${sortedSpots.length === 1 ? '' : 's'} in view, busiest first`
+                      : 'Tap a glow to reveal the vibe'}
                   </Text>
-                  <MaterialIcons
-                    name="map"
-                    size={24}
-                    color={theme.primary}
-                    style={{ marginLeft: 8 }}
-                  />
                 </View>
-                <Text style={styles.subtitle}>
-                  Tap a glow to reveal the vibe
-                </Text>
-              </>
-            )}
-          </BottomSheetView>
+              }
+              renderItem={({ item }) => {
+                const catColor = CATEGORY_COLORS[item.properties.category] || '#FB923C';
+                return (
+                  <TouchableOpacity
+                    style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderTopWidth: 1, borderTopColor: theme.border }}
+                    onPress={() => {
+                      setSelectedSpot(item);
+                      bottomSheetRef.current?.snapToIndex(1);
+                      cameraRef.current?.flyTo(item.geometry.coordinates, 800);
+                    }}
+                  >
+                    <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: catColor, marginRight: 12 }} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: theme.text, fontWeight: '700', fontSize: 15 }} numberOfLines={1}>
+                        {item.properties.name}
+                      </Text>
+                      <Text style={{ color: theme.subtext, fontSize: 13, marginBottom: 6 }} numberOfLines={1}>
+                        {item.properties.category}{item.properties.vibe ? ` • ${item.properties.vibe}` : ''}
+                      </Text>
+                      <View style={{ height: 6, width: '100%', backgroundColor: theme.border, borderRadius: 3, overflow: 'hidden' }}>
+                        <View style={{ height: '100%', width: `${item.properties.intensity * 100}%`, backgroundColor: catColor, borderRadius: 3 }} />
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                );
+              }}
+            />
+          )}
         </BottomSheet>
 
         <Animated.View style={[
